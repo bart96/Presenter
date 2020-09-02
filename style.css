@@ -1,0 +1,274 @@
+* {
+	margin: 0;
+	border: 0;
+	padding: 0;
+	user-select: none;
+	list-style-type: none;
+	font-family: 'Roboto', sans-serif;
+	box-sizing: border-box;
+}
+
+html, body {
+	height: 100%;
+	background: #000;
+	color: #FFF;
+}
+
+main #search,
+main #songs,
+main #nav,
+main #control {
+	cursor: default;
+}
+
+main {
+	display: grid;
+	grid-gap: 0;
+	grid-template-columns: 400px auto;
+	grid-template-rows: 39px auto 16vw;
+	height: 100%;
+	cursor: none;
+}
+
+main #preview { grid-row: 3 / 3; grid-column: 1 / span 2; }
+
+main input#search {
+	width: 100%;
+	height: 39px;
+	padding: 0 15px 0 45px;
+	color: #FFF;
+	user-select: auto;
+
+	background: #FF6B6B url('data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9JzMwMHB4JyB3aWR0aD0nMzAwcHgnICBmaWxsPSIjRkZGRkZGIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTEyIDUxMiIgZW5hYmxlLWJhY2tncm91bmQ9Im5ldyAwIDAgNTEyIDUxMiIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PHBhdGggZD0iTTUxMS45ODcsNDU0LjA4NkwzNzUuNjUsMzE3Ljc0OGMyMS40NTItMzIuNDA0LDMzLjkzNi03MS4xODYsMzMuOTM2LTExMi45MzQgIGMwLTExMy4xMjEtOTEuNjgzLTIwNC44MDUtMjA0Ljc4Ni0yMDQuODA1QzkxLjY5NSwwLjAwOSwwLjAxMyw5MS42OTMsMC4wMTMsMjA0LjgxNGMwLDExMy4wOSw5MS42ODMsMjA0LjgwNSwyMDQuNzg3LDIwNC44MDUgIGM0MS43MzEsMCw4MC41NTktMTIuNTI5LDExMi45MzItMzMuOTY3TDQ1NC4wNjgsNTExLjk5TDUxMS45ODcsNDU0LjA4NnogTTU4LjA0MiwyMDQuODQ1YzAtODEuMDYsNjUuNzE1LTE0Ni43NDUsMTQ2Ljc1OC0xNDYuNzQ1ICBjODEuMDU5LDAsMTQ2Ljc3Myw2NS42ODUsMTQ2Ljc3MywxNDYuNzQ1YzAsODEuMDYxLTY1LjcxNSwxNDYuNzc2LTE0Ni43NzMsMTQ2Ljc3NkMxMjMuNzU3LDM1MS42MjEsNTguMDQyLDI4NS45MDYsNTguMDQyLDIwNC44NDV6ICAiPjwvcGF0aD48L3N2Zz4=') 15px center/20px 20px no-repeat;
+}
+
+main #songs {
+	position: relative;
+	height: 100%;
+	overflow: hidden;
+	overflow-y: auto;
+}
+
+main.over #songs::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	border: 4px dashed #C7F464;
+}
+
+main #songs li {
+	padding: 10px 15px;
+	cursor:	pointer;
+}
+
+main #songs li button {
+	float: right;
+	padding: 0 5px;
+	font-size: 16px;
+	background: transparent;
+	color: #FFF;
+	cursor: pointer;
+}
+
+main #songs li button:hover {
+	background: #555555;
+}
+
+main #control {
+	overflow: hidden;
+	overflow-y: auto;
+	/*scroll-behavior: smooth;*/
+}
+
+main #control span {
+	display: block;
+	padding: 10px 0;
+}
+
+main #control span.hidden {
+	opacity: .2;
+}
+
+main #control span p {
+	padding: 2px 15px;
+	cursor: pointer;
+}
+
+main #control span p.overflow::before {
+	content: '(!)';
+	color: #C44D58;
+	margin-right: 5px;
+	/*
+	content: '';
+	padding: 8px 10px;
+	background: url('data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9JzMwMHB4JyB3aWR0aD0nMzAwcHgnICBmaWxsPSIjYzQ0ZDU4IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4bWw6c3BhY2U9InByZXNlcnZlIiB2ZXJzaW9uPSIxLjEiIHN0eWxlPSJzaGFwZS1yZW5kZXJpbmc6Z2VvbWV0cmljUHJlY2lzaW9uO3RleHQtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjtpbWFnZS1yZW5kZXJpbmc6b3B0aW1pemVRdWFsaXR5OyIgdmlld0JveD0iMCAwIDg0Ni42NiA4NDYuNjYiIHg9IjBweCIgeT0iMHB4IiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCI+PGRlZnM+PHN0eWxlIHR5cGU9InRleHQvY3NzIj4KICAgCiAgICAuZmlsMCB7ZmlsbDojYzQ0ZDU4O2ZpbGwtcnVsZTpub256ZXJvfQogICAKICA8L3N0eWxlPjwvZGVmcz48Zz48cGF0aCBjbGFzcz0iZmlsMCIgZD0iTTQyMy4zMyAxNDYuOTVjMTUyLjYzLDAgMjc2LjM4LDEyMy43NSAyNzYuMzgsMjc2LjM4IDAsMTUyLjYzIC0xMjMuNzUsMjc2LjM4IC0yNzYuMzgsMjc2LjM4IC0xNTIuNjMsMCAtMjc2LjM4LC0xMjMuNzUgLTI3Ni4zOCwtMjc2LjM4IDAsLTE1Mi42MyAxMjMuNzUsLTI3Ni4zOCAyNzYuMzgsLTI3Ni4zOHptLTI5LjIxIDEyNC4wM2w1OC40NCAwIDAgMjA0LjUzIC01OC40NCAwIDAgLTIwNC41M3ptMjkuMjEgMjM2LjUzYzE4LjgzLDAgMzQuMDksMTUuMjYgMzQuMDksMzQuMSAwLDE4LjgyIC0xNS4yNiwzNC4wOCAtMzQuMDksMzQuMDggLTE4LjgyLDAgLTM0LjA4LC0xNS4yNiAtMzQuMDgsLTM0LjA4IDAsLTE4Ljg0IDE1LjI2LC0zNC4xIDM0LjA4LC0zNC4xem0wIC0zMDYuMTljLTEyMi42MSwwIC0yMjIuMDEsOTkuNCAtMjIyLjAxLDIyMi4wMSAwLDEyMi42MSA5OS40LDIyMi4wMSAyMjIuMDEsMjIyLjAxIDEyMi42MSwwIDIyMiwtOTkuNCAyMjIsLTIyMi4wMSAwLC0xMjIuNjEgLTk5LjM5LC0yMjIuMDEgLTIyMiwtMjIyLjAxeiI+PC9wYXRoPjwvZz48L3N2Zz4=') left center/16px 16px no-repeat;
+	*/
+}
+
+main #nav {
+	z-index: 99;
+}
+
+main #nav li,
+main #control li {
+	display: inline-block;
+	padding: 10px 15px;
+	cursor: pointer;
+}
+
+main #preview {
+	overflow: hidden;
+	text-align: center;
+	font-size: 4.5vw;
+	line-height: 6.5vw;
+	margin: 1.6vw 0 1.4vw;
+	opacity: 1;
+	transition: opacity .4s;
+	/*scroll-behavior: smooth;*/
+}
+
+main #preview.black {
+	opacity: 0;
+}
+
+main #preview p {
+	white-space: nowrap;
+}
+
+main #preview p.copyright {
+	font-size: 3vw;
+	line-height: 4vw;
+	padding: 2.5vw 0;
+}
+
+
+.modal {
+	display: none;
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 60%;
+	overflow: hidden;
+	z-index: 999;
+}
+
+.modal.show {
+	display: block;
+}
+
+.modal .container {
+	position: relative;
+	margin: auto;
+	width: 1200px;
+	transition: margin-top ease-in .4s;
+}
+
+.modal.show .container {
+	margin-top: 100px;
+}
+
+.modal .container header,
+.modal .container footer {
+	min-height: 30px;
+	padding: 5px 16px;
+}
+
+.modal .container header button {
+	position: absolute;
+	right: 0;
+	top: 0;
+	padding: 8px 16px;
+	background: inherit;
+	color: inherit;
+	cursor: pointer;
+}
+
+.modal .container footer button {
+	padding: 7px 10px;
+	color: inherit;
+	cursor: pointer;
+}
+
+.modal .container .content {
+	min-height: 100px;
+	padding: 5px 15px 0;
+}
+
+
+.modal ul.options {
+	margin: 0 -5px;
+	padding: 10px 0;
+}
+
+.modal ul.options li {
+	float: left;
+	margin: 0 5px 10px;
+	padding: 5px 10px;
+	cursor: pointer;
+
+}
+
+.modal .edit {
+	width: 100%;
+	border-bottom: 1px solid;
+	padding: 8px 10px;
+	user-select: auto;
+	font-size: 14px;
+}
+
+.modal .edit span {
+	margin: 0 5px;
+}
+
+.close::after {
+	content: '×';
+}
+
+
+main #nav,
+main #songs,
+main #nav li,
+main #control span p:hover,
+main #control span p.active{
+	background: #161616;
+}
+
+main #songs li:hover,
+main #nav li:hover {
+	background: #353535;
+}
+
+.modal .container footer button,
+.modal .container header button:hover,
+.modal .edit span,
+.modal ul.options li,
+main #nav li.active,
+main #songs li.active {
+	background: #C44D58;
+
+}
+
+.modal .container footer button:hover,
+.modal .container header,
+.modal .container footer,
+main #nav li.active:hover,
+main #songs li.active:hover {
+	background: #FF6B6B;
+}
+
+main #songs li.dragged {
+	background: #4ECDC4;
+}
+
+.modal .container .content,
+main #control span.active {
+	background: #222;
+}
+
+main.over #songs {
+	background: #101010;
+}

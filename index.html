@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Presenter</title>
+
+    <script type="text/javascript" src="script.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css" media="all">
+</head>
+<body>
+<main></main>
+
+<script>
+    (function(e) {
+		let gui = new GUI(e);
+		new DragNDrop(e, ['text/plain'], 'over').onFileLoaded(text => {
+			gui.addCCLISong(new CCLISong(text));
+		}).onError(console.log);
+	})(element.from('main'));
+</script>
+</body>
+</html>
