@@ -13,8 +13,8 @@
 
 <script>
     (function(e) {
+		let storage = new Storage();
 		let gui = new GUI(e);
-    	let storage = new Storage();
 
     	gui.addSongAddListener(fn => storage.addSong(fn))
             .addSongChangeListener(fn => storage.changeSong(fn))

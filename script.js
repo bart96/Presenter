@@ -48,6 +48,14 @@ class element {
 		return this.element.lastElementChild;
 	}
 
+	get previousElementSibling() {
+		return this.element.previousElementSibling;
+	}
+
+	get nextElementSibling() {
+		return this.element.nextElementSibling;
+	}
+
 	get offsetHeight() {
 		return this.element.offsetHeight;
 	}
@@ -82,13 +90,29 @@ class element {
 		return this;
 	}
 
+	shiftChild() {
+		if(this.element.firstElementChild) {
+			this.element.removeChild(this.element.firstElementChild);
+		}
+
+		return this;
+	}
+
+	popChild() {
+		if(this.element.lastElementChild) {
+			this.element.removeChild(this.element.lastElementChild);
+		}
+
+		return this;
+	}
+
 	id(id) {
 		this.element.id = id;
 		return this;
 	}
 
-	removeClass(... classees) {
-		this.element.classList.remove(... classees);
+	removeClass(... classes) {
+		this.element.classList.remove(... classes);
 		return this;
 	}
 
@@ -136,6 +160,11 @@ class element {
 		return this;
 	}
 
+	style(parameter, value) {
+		this.element.style[parameter] = value;
+		return this;
+	}
+
 	selected(selected) {
 		this.element.selected = selected;
 		return this;
@@ -174,17 +203,25 @@ class element {
 		return this.element.querySelector(selector);
 	}
 
-	before(element) {
-		element.parentElement.insertBefore(this.element, element);
+	before(el) {
+		if(el instanceof element) {
+			el = el.element;
+		}
+
+		el.parentElement.insertBefore(this.element, el);
 		return this;
 	}
 
-	after(element) {
-		if(element.nextElementSibling === null) {
-			element.parentElement.appendChild(this.element);
+	after(el) {
+		if(el instanceof element) {
+			el = el.element;
+		}
+
+		if(el.nextElementSibling === null) {
+			el.parentElement.appendChild(this.element);
 		}
 		else {
-			element.parentElement.insertBefore(this.element, element.nextElementSibling);
+			el.parentElement.insertBefore(this.element, el.nextElementSibling);
 		}
 
 		return this;
@@ -218,7 +255,7 @@ class element {
 	}
 
 	height(height) {
-		this.element.style = height;
+		this.element.style.height = height;
 		return this;
 	}
 
@@ -386,6 +423,106 @@ class Loadable {
 	}
 }
 
+let AJAX = new (function() {
+	let init = (method, url, callback) => {
+		let xhttp;
+
+		if (window.XMLHttpRequest) {
+			xhttp = new XMLHttpRequest();
+		} else {
+			xhttp = new ActiveXObject("Microsoft.XMLHTTP");
+		}
+
+		xhttp.open(method, url, true);
+		xhttp.onreadystatechange = function () {
+			if (this.readyState === 4) {
+				if(this.status === 200) {
+					callback.success(this.responseText);
+				}
+				else {
+					callback.error(this.responseText);
+				}
+			}
+		};
+
+		return xhttp;
+	};
+
+	let convert = (params) => {
+		if(params && typeof params === "object") {
+			let p = [];
+			Object.entries(params).forEach(e => {
+				p.push(e[0] + '=' + e[1]);
+			});
+
+			return p.join('&');
+		}
+
+		return params;
+	};
+
+	this.get = (url) => {
+		let success, error;
+		let xhttp = init('GET', url, {
+			success: (r) => {
+				if(success) {
+					success(r);
+				}
+			},
+			error: (r) => {
+				if(error) {
+					error(r);
+				}
+			}
+		});
+		xhttp.send();
+
+		let $ = {
+			success: fn => {
+				success = fn;
+				return $;
+			},
+			error: fn => {
+				error = fn;
+				return $;
+			}
+		}
+
+		return $;
+	};
+
+	this.post = (url, params) => {
+		let success, error;
+		let xhttp = init('POST', url, {
+			success: (r) => {
+				if(success) {
+					success(r);
+				}
+			},
+			error: (r) => {
+				if(error) {
+					error(r);
+				}
+			}
+		});
+		xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+		xhttp.send(convert(params));
+
+		let $ = {
+			success: fn => {
+				success = fn;
+				return $;
+			},
+			error: fn => {
+				error = fn;
+				return $;
+			}
+		}
+
+		return $;
+	}
+})();
+
 class Storable extends Loadable {
 	static instances = [];
 
@@ -421,7 +558,7 @@ class Storable extends Loadable {
 			this.convert(data);
 		}
 		catch(e) {
-			console.log('Couldn\'t load data "' + this.itemName + '" from localStorage: ' + e.message);
+			Notification.warning('Couldn\'t load data "' + this.itemName + '" from localStorage: ' + e.message);
 		}
 	}
 
@@ -438,6 +575,7 @@ class Storage extends Storable {
 			version: '1.0',
 			songs: {}
 		});
+
 	}
 
 	convert(data) {
@@ -468,7 +606,9 @@ class Storage extends Storable {
 	}
 
 	changeSong(type, song) {
+		// ToDO
 		console.log(type, song);
+
 		return this;
 	}
 
@@ -479,12 +619,14 @@ class Storage extends Storable {
 
 	updateSongId(song, old) {
 		delete this.data.songs[old];
+
 		this.addSong(song);
 	}
 }
 
 let Modal = new class {
 	constructor() {
+		this.isActive = false;
 		this.modal = new element('div').class('modal');
 		this.callback = null;
 
@@ -494,15 +636,16 @@ let Modal = new class {
 		});
 		let header = new element('header').parent(this.container);
 		this.content = new element('div').class('content').parent(this.container);
-		let footer = new element('footer').parent(this.container);
+		this.footer = new element('footer').parent(this.container);
 
 		this.title = new element('h2').parent(header);
 		new element('button').html('&times;').parent(header).on('click', e => {
-			this.modal.classList.remove('show');
+			this.close();
 		});
 
-		new element('button').text('OK').parent(footer).on('click', e => {
-			this.modal.classList.remove('show');
+		new element('button').type('submit').text('OK').parent(this.footer).on('click', e => {
+			this.close();
+
 			if(this.callback) {
 				this.callback();
 			}
@@ -513,14 +656,22 @@ let Modal = new class {
 		});
 	}
 
-	show(title, element) {
-		this.modal.class('show');
+	show(title, element, hideFooter) {
+		this.isActive = true;
 		this.title.text(title);
 		this.callback = null;
-		this.content.clear();
+		this.content.removeClass('resizable').height('auto').clear();
+		this.footer.style('display', hideFooter ? 'none' : 'block');
+
 		this.content.appendChild(element);
+		this.modal.class('show');
 
 		return this;
+	}
+
+	close() {
+		this.isActive = false;
+		this.modal.classList.remove('show');
 	}
 
 	onApply(fn) {
@@ -531,6 +682,134 @@ let Modal = new class {
 	width(width) {
 		this.container.width(width);
 		return this;
+	}
+
+	height(height) {
+		this.content.height(height);
+		return this;
+	}
+
+	resizable(initialHeight) {
+		this.content.class('resizable');
+
+		if(initialHeight) {
+			this.height(initialHeight);
+		}
+
+		return this;
+	}
+}
+
+let Account = new class {
+	constructor() {
+		this.isLoggedIn = false;
+		this.data = Object.assign({
+			mail: '',
+			license: 0
+		}, JSON.parse(localStorage.getItem('account') || '{}'));
+
+		if(!isNaN(parseInt(this.data.license))) {
+			this.request();
+		}
+	}
+
+	get license() {
+		return this.data.license;
+	}
+
+	request(success) {
+		AJAX.post('rest.php?login', this.data).success(r => {
+			this.isLoggedIn = true;
+			localStorage.setItem('account', JSON.stringify(this.data));
+
+			if(success) {
+				success(r);
+			}
+		}).error(r => {
+			this.isLoggedIn = false;
+			Notification.rest(r)
+		});
+	}
+
+	login() {
+		let wrapper = new element('form').class('login');
+		let mail = new element('input').type('mail').name('mail').placeholder('Mail ...').value(this.data.mail).parent(wrapper);
+		let license = new element('input').type('text').name('license').placeholder('CCLI License ...').value(this.data.license).parent(wrapper);
+
+		Modal.show('Login', wrapper).width('400px').onApply(r => {
+			this.data = {
+				mail: mail.value().trim(),
+				license: parseInt(license.value().trim()) || 0
+			};
+
+			this.request(r => {
+				Notification.rest(r);
+				Modal.close();
+			});
+		});
+	}
+}
+
+let Notification = new class extends Loadable {
+	constructor() {
+		super();
+		this.container = new element('ul').id('alerts');
+
+		this.addOnLoadListener(() => {
+			this.container.parent(document.body);
+		});
+	}
+
+	message(message, type) {
+		while(this.container.children.length > 2) {
+			this.container.popChild();
+		}
+
+		let alert = new element('div').class('alert', type).text(message).parent(this.container).attribute('data-created', Date.now());
+		new element('button').type('button').text('×').tooltip('close').parent(alert).on('click', r => {
+			alert.remove();
+		});
+
+		setTimeout(() => {
+			alert.remove();
+		}, Config.get('notificationDisappearTime', '3000'));
+	}
+
+	success(message) {
+		this.message(message, 'success');
+	}
+
+	warning(message) {
+		this.message(message, 'warning');
+	}
+
+	error(message) {
+		this.message(message, 'error');
+	}
+
+	rest(json) {
+		try {
+			let data = JSON.parse(json);
+
+			if(data.success) {
+				data.success.forEach(message => {
+					this.success(message);
+				});
+			}
+			if(data.warnings) {
+				data.warnings.forEach(message => {
+					this.warning(message);
+				});
+			}
+			if(data.errors) {
+				data.errors.forEach(message => {
+					this.error(message);
+				})
+			}
+		}
+		catch(e) {
+			this.error(json);
+		}
 	}
 }
 
@@ -586,7 +865,7 @@ class GUI {
 
 		rootElement.on('contextmenu', e => e.preventDefault());
 
-		this.search = new element('input').id('search').parent(rootElement);
+		let search = new element('div').id('search').parent(rootElement);
 		this.elementNav = new element('ul').id('nav').parent(rootElement);
 		this.elementSongs = new element('ul').id('songs').parent(rootElement);
 		this.elementControl = new element('div').id('control').parent(rootElement);
@@ -596,12 +875,76 @@ class GUI {
 		this.config = new element('li').class('config').parent(this.elementNav).on('click', e => {
 			this.showConfig();
 		});
+		this.account = new element('li').class('account').parent(this.elementNav).on('click', e => {
+			Account.login();
+		});
+
+		this.search = new element('input').parent(search);
+		let searchResults = new element('ul').parent(search);
 
 		this.search.on('drop', e => {
 			let text = e.dataTransfer.getData('text/plain');
 
 			if(text) {
 				this.search.value(text);
+			}
+		});
+
+		this.search.on('input', e => {
+			searchResults.clear();
+
+			if(!Account.isLoggedIn) {
+				Notification.error('Please log in');
+				return ;
+			}
+
+			let subject = this.search.value().trim();
+
+			if(subject) {
+				AJAX.post('rest.php?search', {
+					subject: subject
+				}).success(r => {
+					let json = JSON.parse(r);
+
+
+					json.forEach(song => {
+						new element('li').text('(' + song.songNumber + ') ' + song.title).parent(searchResults).on('mousedown', e => {
+							// ToDo
+							CCLISong.download(song.songNumber).success(r => {
+								this.addSong(r);
+							});
+						});
+					});
+				}).error(r => {
+					// ToDo
+					console.error(r);
+				});
+			}
+		});
+		this.search.on('keypress', e => {
+			switch(e.key) {
+				case 'Enter':
+					let subject = this.search.value().trim();
+
+					if(subject) {
+						AJAX.post('rest.php?search&text', {
+							subject: subject
+						}).success(r => {
+							let json = JSON.parse(r);
+							searchResults.clear();
+
+							json.forEach(song => {
+								new element('li').text('(' + song.songNumber + ') ' + song.title).parent(searchResults).on('click', e => {
+									// ToDo
+									console.log(song.songNumber)
+								});
+							});
+						}).error(r => {
+							// ToDo
+							console.error(r);
+						});
+					}
+					break;
 			}
 		});
 
@@ -617,6 +960,10 @@ class GUI {
 		};
 
 		document.onkeydown = (e) => {
+			if(Modal.isActive) {
+				return;
+			}
+
 			switch(e.code) {
 				case 'Home':
 					this.current.index = 0;
@@ -656,7 +1003,7 @@ class GUI {
 
 			e.preventDefault();
 			e.stopPropagation();
-		}
+		};
 	}
 
 	addSongAddListener(fn) {
@@ -688,6 +1035,10 @@ class GUI {
 				e.dataTransfer.setData('text/plain', song.title);
 			})
 			.on('dragover', e => {
+				if(!this.songToMove) {
+					return;
+				}
+
 				e.preventDefault();
 				e.dataTransfer.dropEffect = 'move';
 
@@ -708,7 +1059,7 @@ class GUI {
 		new element('button').class('close').tooltip('remove').parent(li).listener('click', e => {
 			e.stopPropagation();
 
-			if(Config.get('confirmDelete', true) && !confirm('Do you really want to remove the song?')) {
+			if(Config.get('confirmDelete', false) && !confirm('Do you really want to remove the song?')) {
 				return;
 			}
 
@@ -755,6 +1106,7 @@ class GUI {
 
 		this.elementNav.clear();
 		this.config.parent(this.elementNav);
+		this.account.parent(this.elementNav);
 		this.elementControl.clear();
 		this.elementPreview.clear();
 		this.switchActive(this.elementSongs, li);
@@ -799,10 +1151,15 @@ class GUI {
 	}
 
 	editSong(song, li) {
+		let $ = this;
 		let wrapper = new element('div');
 		let blocks = {};
 		let currentBlock = null;
 		let orderCursorPosition = 0;
+		let editBlock = new element('textarea');
+		let editOrder = new element('input');
+		let toggleDelete = new element('li');
+		let createNew = new element('li');
 
 		function editBlockHandler() {
 			blocks[currentBlock] = editBlock.value();
@@ -824,21 +1181,23 @@ class GUI {
 			}
 		}
 
-		let editBlock = new element('textarea').parent(wrapper);
-		let editOrder = new element('input').class('edit').value(song.order.join(' | '));
+		function createBlock(type, block, active) {
+			if(block) {
+				if(Array.isArray(block)) {
+					block = block.join('\n');
+				}
+			}
+			else {
+				block = '';
+			}
 
-		editBlock.on('blur', editBlockHandler);
-		editOrder.on('click', editOrderHandler).on('blur', editOrderHandler).on('keyup', editOrderHandler);
+			blocks[type] = block;
 
-		let ul = new element('ul').class('options').parent(wrapper);
-		song.initialOrder.forEach((order, i) => {
-			blocks[order] = song.blocks[order].join('\n');
+			let li = new element('li').text(type).before(createNew).on('click', e => {
+				currentBlock = type;
+				editBlock.value(blocks[type]);
 
-			let li = new element('li').text(order).parent(ul).on('click', e => {
-				currentBlock = order;
-				editBlock.value(blocks[order]);
-
-				this.switchActive(ul, li);
+				$.switchActive(ul, li);
 			}).on('dblclick', e => {
 				let currentText = editOrder.value();
 				let insertText = li.element.textContent;
@@ -857,15 +1216,64 @@ class GUI {
 					editOrder.value(currentText.substr(0, nextPart) + insertText + currentText.substr(nextPart));
 				}
 
+				// ToDo: remove unnecessary double blocks
+
 				orderCursorPosition += insertText.length;
 			});
 
-			if(i < 1) {
-				currentBlock = order;
-				editBlock.value(blocks[order]);
+			new element('button').type('button').parent(li).on('click', e => {
+				if(ul.children.length < 4) {
+					Notification.error('You can\'t remove all blocks');
+					return;
+				}
 
-				li.classList.add('active');
+				let active = li.previousElementSibling;
+				$.switchActive(ul, toggleDelete.is(active) ? active.nextElementSibling : active);
+
+				li.remove();
+
+				editOrder.value(editOrder.value().split('|').filter(e => {
+					return e.trim() !== type
+				}).join('|'));
+
+				delete blocks[type];
+			});
+
+			if(active) {
+				currentBlock = type;
+				editBlock.value(blocks[type]);
+
+				$.switchActive(ul, li);
 			}
+		}
+
+		editBlock.parent(wrapper).on('blur', editBlockHandler);
+		editOrder.class('edit').value(song.order.join(' | '))
+			.on('click', editOrderHandler).on('blur', editOrderHandler)
+			.on('keyup', editOrderHandler);
+
+		let ul = new element('ul').class('options').parent(wrapper);
+		toggleDelete.text('-').parent(ul).on('click', e => {
+			ul.classList.toggle('remove');
+		});
+		createNew.text('+').parent(ul).on('click', e => {
+			let name = prompt('Name', Config.get('newVerseValue', 'Outro'));
+
+			if(!name) {
+				return;
+			}
+
+			if(Object.keys(blocks).includes(name)) {
+				Notification.error('Block "' + name + '" does already exist');
+				return ;
+			}
+
+			createBlock(name, [], true);
+		});
+
+
+		song.initialOrder.forEach((order, i) => {
+			createBlock(order, song.blocks[order], i < 1);
 		});
 
 		editOrder.parent(wrapper);
@@ -875,11 +1283,23 @@ class GUI {
 			let newOrder = [];
 
 			let value = editOrder.value().split('|');
+			let types = Object.keys(blocks);
+
+			for(let i in blocks) {
+				song.setBlock(i, blocks[i].replace(/(\n\s*)|(\s*\n)|(\n\s*\n)/g, '\n').split('\n'));
+			}
+
 			value.forEach(v => {
 				v = v.trim();
 
-				if(song.initialOrder.includes(v)) {
+				if(types.includes(v)) {
 					newOrder.push(v);
+				}
+			});
+
+			Object.keys(song.blocks).forEach(type => {
+				if(!types.includes(type)) {
+					song.removeBlock(type);
 				}
 			});
 
@@ -892,12 +1312,13 @@ class GUI {
 			})
 
 			song.saveOrder(newOrder);
-			for(let i in blocks) {
-				song.saveBlock(i, blocks[i].replace(/(\n\s*)|(\s*\n)|(\n\s*\n)/g, '\n').split('\n'));
-			}
 
 			if(Config.get('reloadSongAfterEdit', false)) {
 				this.showSong(song, li);
+			}
+
+			if(Account.isLoggedIn) {
+				song.upload();
 			}
 		});
 	}
@@ -921,7 +1342,7 @@ class GUI {
 				.attribute('key', k)
 		});
 
-		Modal.show('Configuration', table).width('400px').onApply(r => {
+		Modal.show('Configuration', table).width('400px').resizable('173px').onApply(r => {
 			Array.from(table.getElementsByTagName('td')).forEach(td => {
 				let key = td.getAttribute('key');
 
@@ -1057,14 +1478,43 @@ class Song {
 		return this;
 	}
 
-	saveBlock(type, block) {
-		if(this.blocks[type]) {
-			this.blocks[type] = block;
+	hasBlock(type) {
+		return Object.keys(type).includes(type);
+	}
+
+	setBlock(type, block) {
+		if(!Array.isArray(block)) {
+			throw new Error('"block" needs to be an array');
 		}
+
+		if(!this.initialOrder.includes(type)) {
+			this.initialOrder.push(type);
+		}
+
+		this.blocks[type] = block;
+		return this;
+	}
+
+	removeBlock(type) {
+		if(delete this.blocks[type]) {
+			let filter = e => {
+				return  e !== type;
+			}
+
+			this.initialOrder = this.initialOrder.filter(filter);
+			this.order = this.order.filter(filter);
+		}
+
+		return this;
 	}
 
 	saveOrder(order) {
 		this.order = order;
+		return this;
+	}
+
+	upload() {
+		throw new Error('Child class needs to implement the method "upload"');
 	}
 }
 
@@ -1075,12 +1525,12 @@ class CCLISong extends Song {
 		let duplicates = 0;
 
 		song.title = rows.splice(0, 3).shift();
-		song.CCLILicense = rows.pop();
+		song.account = parseInt(rows.pop().replace(/[^0-9]/g, ''));
 		do {
-			song.CCLISongNumber = rows.pop();
-		} while (!song.CCLISongNumber.startsWith('CCLI-'));
+			song.songNumber = rows.pop();
+		} while (!song.songNumber.startsWith('CCLI-'));
 
-		song.songNumber = song.CCLISongNumber.replace(/[^0-9]/g, '');
+		song.songNumber = parseInt(song.songNumber.replace(/[^0-9]/g, ''));
 
 		rows.join('\n').split('\n\n\n').forEach(block => {
 			let row = block.split('\n').filter(e => { return e !== ''; });
@@ -1098,20 +1548,103 @@ class CCLISong extends Song {
 		return song;
 	}
 
+	static download(songNumber) {
+		let success = e => {
+			console.log(e);
+		}
+		let error = e => {
+			Notification.rest(e);
+		}
+
+		AJAX.get('rest.php?song=' + songNumber).success(r => {
+			let obj = JSON.parse(r);
+
+			obj.order = obj.order.split(',');
+			obj.initialOrder = obj.initialOrder.split(',');
+
+			for(let i in obj.blocks) {
+				let block = [];
+
+				obj.blocks[i].split(' # ').forEach(line => {
+					block.push(line.replace(/\{#}/g, '#'));
+				});
+
+				obj.blocks[i] = block;
+			}
+
+			success(new CCLISong(obj));
+		}).error(error);
+
+		return {
+			success: fn => {
+				if(fn) {
+					success = fn;
+				}
+			},
+			error: fn => {
+				if(fn) {
+					error = fn;
+				}
+			}
+		}
+	}
+
 	constructor(obj) {
 		obj = Object.assign({
-			CCLILicense: 'None',
-			CCLISongNumber: -1
+			account: Account.license,
 		}, obj);
 
 		super(obj);
 
-		this.CCLILicense = obj.CCLILicense;
-		this.CCLISongNumber = obj.CCLISongNumber;
+		this.account = parseInt(obj.account);
 	}
 
 	get license() {
-		return this.CCLISongNumber + '<br />' + this.CCLILicense;
+		return 'CCLI-Liednummer ' + this.songNumber + '<br />CCLI-Lizenznummer ' +  this.account;
+	}
+
+	upload() {
+		let success = e => {
+			if(Config.get('showSongUploadNotifications', true)) {
+				Notification.rest(e);
+			}
+		};
+		let error = e => {
+			Notification.rest(e);
+		};
+
+		let song = {
+			account: this.account,
+			songNumber: this.songNumber,
+			title: this.title,
+			order: this.order.join(','),
+			initialOrder: this.initialOrder.join(','),
+			blocks: {}
+		}
+
+		for(let i in this.blocks) {
+			let block = [];
+			this.blocks[i].forEach(b => {
+				block.push(b.replace(/#/g, '{#}'));
+			});
+
+			song.blocks[i] = block.join(' # ');
+		}
+
+		AJAX.post('rest.php?song', {song: JSON.stringify(song)}).success(success).error(error);
+
+		return {
+			success: fn => {
+				if(fn) {
+					success = fn;
+				}
+			},
+			error: fn => {
+				if(fn) {
+					error = fn;
+				}
+			}
+		}
 	}
 }
 
