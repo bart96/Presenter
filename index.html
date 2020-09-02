@@ -14,8 +14,17 @@
 <script>
     (function(e) {
 		let gui = new GUI(e);
+    	let storage = new Storage();
+
+    	gui.addSongAddListener(fn => storage.addSong(fn))
+            .addSongChangeListener(fn => storage.changeSong(fn))
+            .addSongRemoveListener(fn => storage.removeSong(fn));
+
+    	storage.addOnLoadListener(s => {
+    		s.songs.forEach(song => gui.addSong(song));
+        });
 		new DragNDrop(e, ['text/plain'], 'over').onFileLoaded(text => {
-			gui.addCCLISong(new CCLISong(text));
+			gui.addSong(CCLISong.parse(text));
 		}).onError(console.log);
 	})(element.from('main'));
 </script>

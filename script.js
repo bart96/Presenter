@@ -360,15 +360,141 @@ class DragNDrop {
 	}
 }
 
+class Loadable {
+	constructor() {
+		this.loaded = false;
+		this.listener = [];
+
+		document.addEventListener("DOMContentLoaded", () => {
+			while(this.listener.length) {
+				this.listener.shift()(this);
+			}
+
+			this.loaded = true;
+		});
+	}
+
+	addOnLoadListener(fn) {
+		if(this.loaded) {
+			fn(this);
+		}
+		else {
+			this.listener.push(fn);
+		}
+
+		return this;
+	}
+}
+
+class Storable extends Loadable {
+	static instances = [];
+
+	constructor(itemName, data) {
+		super();
+
+		if(this.constructor === Storable) {
+			throw new TypeError('Abstract class "Storable" cannot be instantiated directly.');
+		}
+
+		Storable.instances.push(this);
+		this.loaded = false;
+		this.itemName = itemName;
+		this.data = data;
+
+		this.addOnLoadListener(() => {
+			this.load();
+		});
+	}
+
+	convert(data) {
+		this.data = data;
+	}
+
+	load() {
+		try {
+			let data = JSON.parse(localStorage.getItem(this.itemName));
+
+			if(!data) {
+				return;
+			}
+
+			this.convert(data);
+		}
+		catch(e) {
+			console.log('Couldn\'t load data "' + this.itemName + '" from localStorage: ' + e.message);
+		}
+	}
+
+	save() {
+		if(this.data) {
+			localStorage.setItem(this.itemName, JSON.stringify(this.data));
+		}
+	}
+}
+
+class Storage extends Storable {
+	constructor() {
+		super('data', {
+			version: '1.0',
+			songs: {}
+		});
+	}
+
+	convert(data) {
+		switch(data.version) {
+			case '1.0':
+				this.data.version = data.version;
+
+				for(let i in data.songs) {
+					this.addSong(new CCLISong(data.songs[i]));
+				}
+				break;
+			default:
+				throw new Error('Version is invalid');
+		}
+	}
+
+	get songs() {
+		return Object.values(this.data.songs).sort((a, b) => {
+			return a.title - b.title;
+		});
+	}
+
+	addSong(song) {
+		this.data.songs[song.id] = song;
+		song.addChangeListenerId(fn => this.updateSongId(fn));
+
+		return this;
+	}
+
+	changeSong(type, song) {
+		console.log(type, song);
+		return this;
+	}
+
+	removeSong(song) {
+		delete this.data.songs[song.id];
+		return this;
+	}
+
+	updateSongId(song, old) {
+		delete this.data.songs[old];
+		this.addSong(song);
+	}
+}
+
 let Modal = new class {
 	constructor() {
 		this.modal = new element('div').class('modal');
 		this.callback = null;
 
-		let container = new element('div').class('container').parent(this.modal);
-		let header = new element('header').parent(container);
-		this.content = new element('div').class('content').parent(container);
-		let footer = new element('footer').parent(container);
+		this.container = new element('div').class('container').parent(this.modal).on('contextmenu', e => {
+			e.stopPropagation();
+			e.preventDefault();
+		});
+		let header = new element('header').parent(this.container);
+		this.content = new element('div').class('content').parent(this.container);
+		let footer = new element('footer').parent(this.container);
 
 		this.title = new element('h2').parent(header);
 		new element('button').html('&times;').parent(header).on('click', e => {
@@ -387,39 +513,64 @@ let Modal = new class {
 		});
 	}
 
-	show(title, element, callback) {
+	show(title, element) {
 		this.modal.class('show');
 		this.title.text(title);
-		this.callback = callback;
+		this.callback = null;
 		this.content.clear();
 		this.content.appendChild(element);
+
+		return this;
+	}
+
+	onApply(fn) {
+		this.callback = fn;
+		return this;
+	}
+
+	width(width) {
+		this.container.width(width);
+		return this;
 	}
 }
 
-let Config = new class {
+let Config = new class extends Storable {
 	constructor() {
-		this.config = {};
-		this.showCopyrightInControl = false;
-		this.reloadSongOnOrderChange = false;
-		this.confirmDelition = false;
-		this.confirmPageLeave = true;
-		this.scrollAnimation = true;
+		super('config', {});
 	}
 
 	get(item, defaultValue) {
-		if(this.config[item] === undefined) {
+		if(this.data[item] === undefined) {
 			if(defaultValue === undefined) {
 				defaultValue = false;
 			}
 
-			this.config[item] = defaultValue;
+			this.data[item] = defaultValue;
 		}
 
-		return this.config[item];
+		return this.data[item];
 	}
 
 	set(item, value) {
-		this.config[item] = value;
+		if(value === '') {
+			value = undefined;
+		}
+
+		this.data[item] = value;
+		return this;
+	}
+
+	remove(item) {
+		delete this.data[item];
+		return this;
+	}
+
+	forEach(fn) {
+		for(let i in this.data) {
+			if(this.data.hasOwnProperty(i)) {
+				fn(this.data[i], i, this.data);
+			}
+		}
 	}
 }
 
@@ -429,6 +580,12 @@ class GUI {
 			throw new Error('missing "rootElement"');
 		}
 
+		this.songAddListener = [];
+		this.songChangeListener = [];
+		this.songRemoveListener = [];
+
+		rootElement.on('contextmenu', e => e.preventDefault());
+
 		this.search = new element('input').id('search').parent(rootElement);
 		this.elementNav = new element('ul').id('nav').parent(rootElement);
 		this.elementSongs = new element('ul').id('songs').parent(rootElement);
@@ -436,13 +593,28 @@ class GUI {
 		this.elementPreview = new element('div').id('preview').parent(rootElement)
 			.listener('contextmenu', e => e.preventDefault());
 
+		this.config = new element('li').class('config').parent(this.elementNav).on('click', e => {
+			this.showConfig();
+		});
+
+		this.search.on('drop', e => {
+			let text = e.dataTransfer.getData('text/plain');
+
+			if(text) {
+				this.search.value(text);
+			}
+		});
+
+		this.elementSongs.on('dragover', e => {
+			e.preventDefault();
+			e.dataTransfer.dropEffect = 'move';
+		});
+
 		this.songToMove = null;
 		this.current = {
 			index: 1,
 			text: []
 		};
-
-		rootElement.on('contextmenu', e => e.preventDefault());
 
 		document.onkeydown = (e) => {
 			switch(e.code) {
@@ -467,6 +639,10 @@ class GUI {
 
 					this.elementPreview.classList.toggle('black');
 					break;
+				case 'Escape':
+				case 'F10':
+					this.showConfig();
+					break;
 				case 'KeyF':
 					if(!e.ctrlKey) {
 						return;
@@ -474,6 +650,7 @@ class GUI {
 				case 'F12':
 					break;
 				default:
+					//console.log(e.code)
 					return;
 			}
 
@@ -482,26 +659,44 @@ class GUI {
 		}
 	}
 
-	addCCLISong(song) {
+	addSongAddListener(fn) {
+		this.songAddListener.push(fn);
+		return this;
+	}
+
+	addSongChangeListener(fn) {
+		this.songChangeListener.push(fn);
+		return this;
+	}
+
+	addSongRemoveListener(fn) {
+		this.songRemoveListener.push(fn);
+		return this;
+	}
+
+	addSong(song) {
 		let li = new element('li')
 			.text(song.title)
-			.on('dblclick', () => this.showSong(song, li))
+			.on(Config.get('songClickBehaviour', 'dblclick'), () => this.showSong(song, li))
 			.on('contextmenu', e => {
-				this.editOrder(song, li);
+				this.editSong(song, li);
+			})
+			.on('dragstart', e => {
+				this.songToMove = li;
+				this.songToMove.class('dragged');
+				e.dataTransfer.effectAllowed = 'move';
+				e.dataTransfer.setData('text/plain', song.title);
 			})
 			.on('dragover', e => {
+				e.preventDefault();
+				e.dataTransfer.dropEffect = 'move';
+
 				if(this.songToMove.isBefore(e.target)) {
 					this.songToMove.before(e.target);
 				}
 				else {
 					this.songToMove.after(e.target);
 				}
-			})
-			.on('dragstart', e => {
-				this.songToMove = li;
-				this.songToMove.class('dragged');
-				e.dataTransfer.effectAllowed = 'move';
-				e.dataTransfer.setData('text/plain', null);
 			})
 			.on('dragend', () => {
 				this.songToMove.classList.remove('dragged');
@@ -511,20 +706,32 @@ class GUI {
 			.parent(this.elementSongs);
 
 		new element('button').class('close').tooltip('remove').parent(li).listener('click', e => {
+			e.stopPropagation();
+
 			if(Config.get('confirmDelete', true) && !confirm('Do you really want to remove the song?')) {
 				return;
 			}
 
 			li.remove();
+			this.songRemoveListener.forEach(fn => {
+				fn(song);
+			});
+		});
+
+		this.songAddListener.forEach(fn => {
+			fn(song);
 		});
 	}
 
 	addLine(block, line) {
-		let controlLine = new element('p').parent(block).html(line).listener('dblclick', e => {
+		let controlLine = new element('p').parent(block).html(line).listener(Config.get('verseClickBehaviour', 'dblclick'), e => {
 			let lines = Array.from(this.elementControl.getElementsByTagName('p'));
 			this.current.index = lines.indexOf(controlLine.element);
 
-			this.scrollTo(this.current.index, true);
+			this.scrollTo(this.current.index, {
+				scrollToBlock: false,
+				scrollBehavior: Config.get('verseScrollBehaviour', 'auto')
+			});
 		});
 
 		if(this.current.text.length < 1) {
@@ -543,10 +750,11 @@ class GUI {
 	}
 
 	showSong(song, li) {
-		this.current.index = 1;
+		this.current.index = 0;
 		this.current.text = [];
 
 		this.elementNav.clear();
+		this.config.parent(this.elementNav);
 		this.elementControl.clear();
 		this.elementPreview.clear();
 		this.switchActive(this.elementSongs, li);
@@ -566,7 +774,9 @@ class GUI {
 			let li = new element('li').text(order).parent(this.elementNav).listener('click', e => {
 				let index = Array.from(this.elementControl.getElementsByTagName('p')).indexOf(block.firstElementChild);
 				this.current.index = index;
-				this.scrollTo(index);
+				this.scrollTo(index, {
+					scrollBehavior: Config.get('navScrollBehaviour', 'auto')
+				});
 			});
 			block.data('nav', li);
 
@@ -583,82 +793,155 @@ class GUI {
 			let nav = new element('li').text('© Copyright').parent(this.elementNav);
 			block.data('nav', nav);
 		}
-		this.addLine(block, song.CCLISongNumber + '<br />' + song.CCLILicense).class('copyright');
+		this.addLine(block, song.license).class('copyright');
 
 		this.elementControl.firstElementChild.scrollIntoView();
 	}
 
-	editOrder(song, li) {
+	editSong(song, li) {
 		let wrapper = new element('div');
-		let cursorPosition = 0;
+		let blocks = {};
+		let currentBlock = null;
+		let orderCursorPosition = 0;
 
-		let edit = new element('input').class('edit').value(song.order.join(' | '));
+		function editBlockHandler() {
+			blocks[currentBlock] = editBlock.value();
+		}
 
-		function inputHandler() {
-			let length = edit.value().length;
-			cursorPosition = edit.element.selectionStart;
-			edit.value(edit.value().replace(/ *\| */g, ' | ').trim());
+		function editOrderHandler() {
+			let length = editOrder.value().length;
+			orderCursorPosition = editOrder.element.selectionStart;
+			editOrder.value(editOrder.value().replace(/ *\| */g, ' | ').trim());
 
-			cursorPosition += edit.value().length - length;
-			if(edit.element.selectionStart === edit.element.selectionEnd) {
-				if(edit.element.selectionStart !== cursorPosition) {
-					edit.element.selectionEnd = edit.element.selectionStart = cursorPosition;
+			orderCursorPosition += editOrder.value().length - length;
+			if(editOrder.element.selectionStart === editOrder.element.selectionEnd) {
+				if(editOrder.element.selectionStart !== orderCursorPosition) {
+					editOrder.element.selectionEnd = editOrder.element.selectionStart = orderCursorPosition;
 				}
 			}
 			else {
-				cursorPosition = edit.element.selectionStart;
+				orderCursorPosition = editOrder.element.selectionStart;
 			}
 		}
 
-		edit.on('click', inputHandler).on('blur', inputHandler).on('keyup', inputHandler);
+		let editBlock = new element('textarea').parent(wrapper);
+		let editOrder = new element('input').class('edit').value(song.order.join(' | '));
+
+		editBlock.on('blur', editBlockHandler);
+		editOrder.on('click', editOrderHandler).on('blur', editOrderHandler).on('keyup', editOrderHandler);
 
 		let ul = new element('ul').class('options').parent(wrapper);
-		song.initalOrder.forEach(order => {
+		song.initialOrder.forEach((order, i) => {
+			blocks[order] = song.blocks[order].join('\n');
+
 			let li = new element('li').text(order).parent(ul).on('click', e => {
-				let currentText = edit.value();
+				currentBlock = order;
+				editBlock.value(blocks[order]);
+
+				this.switchActive(ul, li);
+			}).on('dblclick', e => {
+				let currentText = editOrder.value();
 				let insertText = li.element.textContent;
-				let nextPart = currentText.indexOf(' | ', cursorPosition);
+				let nextPart = currentText.indexOf(' | ', orderCursorPosition);
 
 				if(nextPart < 0) {
 					if(currentText.length > 0) {
 						insertText = ' | ' + insertText;
 					}
 
-					edit.value(currentText + insertText);
+					editOrder.value(currentText + insertText);
 				}
 				else {
 					insertText = ' | ' + insertText;
 
-					edit.value(currentText.substr(0, nextPart) + insertText + currentText.substr(nextPart));
+					editOrder.value(currentText.substr(0, nextPart) + insertText + currentText.substr(nextPart));
 				}
 
-				cursorPosition += insertText.length;
+				orderCursorPosition += insertText.length;
 			});
+
+			if(i < 1) {
+				currentBlock = order;
+				editBlock.value(blocks[order]);
+
+				li.classList.add('active');
+			}
 		});
 
-		edit.parent(wrapper);
-		cursorPosition = edit.value().length;
+		editOrder.parent(wrapper);
+		orderCursorPosition = editOrder.value().length;
 
-		Modal.show('Order', wrapper, r => {
+		Modal.show('Order', wrapper).width('1200px').onApply(r => {
 			let newOrder = [];
 
-			let value = edit.value().split('|');
+			let value = editOrder.value().split('|');
 			value.forEach(v => {
 				v = v.trim();
 
-				if(song.initalOrder.includes(v)) {
+				if(song.initialOrder.includes(v)) {
 					newOrder.push(v);
 				}
 			});
 
 			if(newOrder.length < 1) {
-				newOrder = song.initalOrder;
+				newOrder = song.initialOrder;
 			}
 
+			this.songChangeListener.forEach(fn => {
+				fn('order', song, newOrder);
+			})
+
 			song.saveOrder(newOrder);
-			if(Config.get('reloadSongOnOrderChange', false)) {
+			for(let i in blocks) {
+				song.saveBlock(i, blocks[i].replace(/(\n\s*)|(\s*\n)|(\n\s*\n)/g, '\n').split('\n'));
+			}
+
+			if(Config.get('reloadSongAfterEdit', false)) {
 				this.showSong(song, li);
 			}
+		});
+	}
+
+	showConfig() {
+		let table = new element('table').class('config');
+
+		Config.forEach((v, k) => {
+			let tr = new element('tr').parent(table).on('contextmenu', e => {
+				let td = tr.querySelector('td');
+
+				if(td) {
+					td.setAttribute('reset', td.getAttribute('reset') === 'true' ? 'false' : 'true');
+				}
+			});
+			new element('th').text(k).parent(tr);
+			new element('td').text(v).parent(tr)
+				.attribute('contenteditable', 'true')
+				.attribute('reset', 'false')
+				.attribute('type', typeof v)
+				.attribute('key', k)
+		});
+
+		Modal.show('Configuration', table).width('400px').onApply(r => {
+			Array.from(table.getElementsByTagName('td')).forEach(td => {
+				let key = td.getAttribute('key');
+
+				if(td.getAttribute('reset') === 'true') {
+					Config.set(key, undefined);
+				}
+				else {
+					let value = td.textContent.trim();
+
+					switch(td.getAttribute('type')) {
+						case 'number':
+							value = Number.bind(null, value);
+							break;
+						case 'boolean':
+							value = value === 'true';
+					}
+
+					Config.set(key, value);
+				}
+			})
 		});
 	}
 
@@ -674,10 +957,15 @@ class GUI {
 		});
 	}
 
-	scrollTo(lineNumber, scrollNotToBlock) {
+	scrollTo(lineNumber, options) {
+		options = Object.assign({
+			scrollToBlock: true,
+			scrollBehavior: 'smooth'
+		}, options || {});
+
 		let offset = 1;
 		let scrollOptions = {
-			behavior: 'smooth',
+			behavior: options.scrollBehavior,
 			block: 'end'
 		}
 
@@ -691,7 +979,7 @@ class GUI {
 		this.elementPreview.children[lineNumber + offset].scrollIntoView(scrollOptions);
 
 		let p = this.elementControl.getElementsByTagName('p')[lineNumber];
-		if(!scrollNotToBlock && p.parentElement.nextElementSibling) {
+		if(options.scrollToBlock && p.parentElement.nextElementSibling) {
 			p.parentElement.nextElementSibling.scrollIntoView(scrollOptions);
 		}
 
@@ -702,55 +990,42 @@ class GUI {
 	}
 }
 
-class CCLISong {
-	constructor(content) {
-		let rows = content.trim().split('\r\n');
-		let duplicates = 0;
+class Song {
+	constructor(obj) {
+		obj = Object.assign({
+			title: 'UNKNOWN',
+			songNumber: -1,
+			blocks: {},
+			initialOrder: [],
+			order: []
+		}, obj);
 
-		this.title = rows.splice(0, 3).shift();
-		this.blocks = {};
-		this.initalOrder = [];
-		this.order = [];
-		this.CCLILicense = rows.pop();
-		do {
-			this.CCLISongNumber = rows.pop();
-		} while (!this.CCLISongNumber.startsWith('CCLI-'));
+		this.changeListenerId = [];
 
-		this.songNumber = this.CCLISongNumber.replace(/[^0-9]/g, '');
+		this.title = obj.title;
+		this.id = obj.songNumber;
+		this.blocks = obj.blocks;
+		this.initialOrder = obj.initialOrder;
+		this.order = obj.order;
+	}
 
-		rows.join('\n').split('\n\n\n').forEach(block => {
-			let row = block.split('\n').filter(e => { return e !== ''; });
-			let type = row.shift();
+	toJSON() {
+		let obj = { ...this };
+		delete obj.changeListenerId;
+		return obj;
+	}
 
-			if(this.initalOrder.includes(type)) {
-				type += ' [' + (++duplicates) + ']';
-			}
+	set id(id) {
+		let old = this.songNumber;
+		this.songNumber = id;
 
-			this.initalOrder.push(type);
-			this.blocks[type] = row;
+		this.changeListenerId.forEach(fn => {
+			fn(this, old);
 		});
-
-		this.loadOrder();
 	}
 
-	loadOrder() {
-		let storage = JSON.parse(localStorage.getItem('CCLISongOrder') || '{}');
-
-		if(storage[this.songNumber]) {
-			this.order = storage[this.songNumber];
-		}
-		else {
-			this.saveOrder(this.initalOrder);
-		}
-	}
-
-	saveOrder(order) {
-		let storage = JSON.parse(localStorage.getItem('CCLISongOrder') || '{}');
-
-		this.order = order;
-		storage[this.songNumber] = order;
-
-		localStorage.setItem('CCLISongOrder', JSON.stringify(storage));
+	get id() {
+		return this.songNumber;
 	}
 
 	get text() {
@@ -762,6 +1037,82 @@ class CCLISong {
 
 		return text;
 	}
+
+	get initialBlocks() {
+		let blocks = {};
+
+		this.initialOrder.forEach(order => {
+			blocks[order] = [... this.blocks[order]];
+		});
+
+		return blocks;
+	}
+
+	get license() {
+		return '';
+	}
+
+	addChangeListenerId(fn) {
+		this.changeListenerId.push(fn);
+		return this;
+	}
+
+	saveBlock(type, block) {
+		if(this.blocks[type]) {
+			this.blocks[type] = block;
+		}
+	}
+
+	saveOrder(order) {
+		this.order = order;
+	}
+}
+
+class CCLISong extends Song {
+	static parse(content) {
+		let song = new CCLISong();
+		let rows = content.trim().split('\r\n');
+		let duplicates = 0;
+
+		song.title = rows.splice(0, 3).shift();
+		song.CCLILicense = rows.pop();
+		do {
+			song.CCLISongNumber = rows.pop();
+		} while (!song.CCLISongNumber.startsWith('CCLI-'));
+
+		song.songNumber = song.CCLISongNumber.replace(/[^0-9]/g, '');
+
+		rows.join('\n').split('\n\n\n').forEach(block => {
+			let row = block.split('\n').filter(e => { return e !== ''; });
+			let type = row.shift();
+
+			if(song.initialOrder.includes(type)) {
+				type += ' [' + (++duplicates) + ']';
+			}
+
+			song.order.push(type);
+			song.initialOrder.push(type);
+			song.blocks[type] = row;
+		});
+
+		return song;
+	}
+
+	constructor(obj) {
+		obj = Object.assign({
+			CCLILicense: 'None',
+			CCLISongNumber: -1
+		}, obj);
+
+		super(obj);
+
+		this.CCLILicense = obj.CCLILicense;
+		this.CCLISongNumber = obj.CCLISongNumber;
+	}
+
+	get license() {
+		return this.CCLISongNumber + '<br />' + this.CCLILicense;
+	}
 }
 
 window.onbeforeunload = e => {
@@ -771,4 +1122,6 @@ window.onbeforeunload = e => {
 	}
 
 	delete e['returnValue'];
+
+	Storable.instances.forEach(i => i.save());
 }
