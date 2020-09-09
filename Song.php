@@ -3,7 +3,23 @@
 	require_once('DB.php');
 
 	class Song extends DB implements JsonSerializable {
-		public static function get(int $account, $songNumber) : Song {
+		public static function has(int $account, int $songNumber) : bool {
+			$stmt = self::prepare('
+				SELECT COUNT(*)
+				FROM `songs`
+				where `account` = ? AND `songnumber` = ?
+			');
+
+			$stmt->bind_param('ii', $account, $songNumber);
+			$stmt->execute();
+			$stmt->bind_result($count);
+			$stmt->fetch();
+			$stmt->close();
+
+			return $count > 0;
+		}
+
+		public static function get(int $account, int $songNumber) : Song {
 			$stmt = self::prepare('
 				SELECT `account`, `songnumber`, `title`, `initialOrder`, `order`
 				FROM `songs`

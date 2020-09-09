@@ -16,15 +16,20 @@
 		let storage = new Storage();
 		let gui = new GUI(e);
 
-    	gui.addSongAddListener(fn => storage.addSong(fn))
-            .addSongChangeListener(fn => storage.changeSong(fn))
-            .addSongRemoveListener(fn => storage.removeSong(fn));
+		storage.addSubscriber(fn => gui.changeHandler(fn));
+		gui.addSubscriber(fn => storage.changeHandler(fn));
 
-    	storage.addOnLoadListener(s => {
-    		s.songs.forEach(song => gui.addSong(song));
-        });
 		new DragNDrop(e, ['text/plain'], 'over').onFileLoaded(text => {
-			gui.addSong(CCLISong.parse(text));
+			CCLISong.parse(text).exists(s => {
+				let message = 'The song "' + s.title + '" with number "' + s.songNumber
+					+ '" already exists.\nDo you want to override it?';
+
+				if(Config.get('overrideSongByImport', false) || confirm(message)) {
+					storage.addSong(s).upload();
+				}
+            }, s => {
+				storage.addSong(s).upload();
+            });
 		}).onError(console.log);
 	})(element.from('main'));
 </script>

@@ -36,6 +36,14 @@ class element {
 		return this.element.children;
 	}
 
+	get index() {
+		if(!this.element.parentElement) {
+			return -1;
+		}
+
+		return Array.from(this.element.parentElement.children).indexOf(this.element);
+	}
+
 	get parentElement() {
 		return this.element.parentElement;
 	}
@@ -547,6 +555,10 @@ class Storable extends Loadable {
 		this.data = data;
 	}
 
+	validData() {
+		return this.data;
+	}
+
 	load() {
 		try {
 			let data = JSON.parse(localStorage.getItem(this.itemName));
@@ -563,7 +575,7 @@ class Storable extends Loadable {
 	}
 
 	save() {
-		if(this.data) {
+		if(this.validData()) {
 			localStorage.setItem(this.itemName, JSON.stringify(this.data));
 		}
 	}
@@ -573,9 +585,13 @@ class Storage extends Storable {
 	constructor() {
 		super('data', {
 			version: '1.0',
-			songs: {}
+			songs: {},
+			order: []
 		});
 
+		this.addSongListener = [];
+		this.changeSongListener = [];
+		this.removeSongListener = [];
 	}
 
 	convert(data) {
@@ -584,12 +600,25 @@ class Storage extends Storable {
 				this.data.version = data.version;
 
 				for(let i in data.songs) {
-					this.addSong(new CCLISong(data.songs[i]));
+					let song = new CCLISong(data.songs[i]);
+					song.addSubscriber((type, song) => this.changeSong(type, song));
+					this.data.songs[i] = song;
+				}
+
+				for(let i in data.order) {
+					this.data.order.push(data.order[i]);
+					this.addSongListener.forEach(fn => {
+						fn(this.data.songs[data.order[i]]);
+					});
 				}
 				break;
 			default:
 				throw new Error('Version is invalid');
 		}
+	}
+
+	validData() {
+		return this.data && this.data.songs && Object.keys(this.data.songs).length > 0;
 	}
 
 	get songs() {
@@ -598,29 +627,100 @@ class Storage extends Storable {
 		});
 	}
 
+	has(song) {
+		if(song && song.id) {
+			return this.data.songs[song.id];
+		}
+
+		if(Number.isInteger(song)) {
+			return this.data.songs[song];
+		}
+
+		return false;
+	}
+
+	addSubscriber(fn) {
+		if(fn) {
+			fn({
+				addSong: fn => {
+					this.addSongListener.push(fn);
+				},
+				changeSong: fn => {
+					this.changeSongListener.push(fn);
+				},
+				removeSong: fn => {
+					this.removeSongListener.push(fn);
+				}
+			});
+		}
+
+		return this;
+	}
+
+	changeHandler(fn) {
+		fn.downloadSong(song => this.addSong(song));
+		fn.removeSong((index, song) => this.removeSong(index, song));
+		fn.songOrder(order => this.songOrder(order));
+	}
+
 	addSong(song) {
-		this.data.songs[song.id] = song;
-		song.addChangeListenerId(fn => this.updateSongId(fn));
+		this.data.order.push(song.id);
 
-		return this;
+		if(this.has(song)) {
+			song = this.data.songs[song.id];
+		}
+		else {
+			this.data.songs[song.id] = song;
+			song.addSubscriber((type, song) => this.changeSong(type, song));
+		}
+
+		this.addSongListener.forEach(fn => {
+			fn(song);
+		});
+
+		return song;
 	}
 
-	changeSong(type, song) {
-		// ToDO
-		console.log(type, song);
+	changeSong(type, song, value) {
+		switch(type) {
+			case 'songId':
+				this.data.order.map(o => o === value ? song.id : o);
 
-		return this;
+				delete this.data.songs[value];
+				this.data.songs[song.id] = song;
+				break;
+			default:
+				console.log(type, song, value);
+		}
+
+		this.changeSongListener.forEach(fn => {
+			fn(type, song, value);
+		});
+
+		return song;
 	}
 
-	removeSong(song) {
-		delete this.data.songs[song.id];
-		return this;
+	removeSong(index, song) {
+		if(index < 0 || index >= this.data.order.length) {
+			return song;
+		}
+
+		song = this.data.songs[song.id];
+
+		let number = this.data.order.splice(index, 1).pop();
+		if(!this.data.order.includes(number)) {
+			this.removeSongListener.forEach(fn => {
+				fn(song);
+			});
+
+			delete this.data.songs[song.id];
+		}
+
+		return song;
 	}
 
-	updateSongId(song, old) {
-		delete this.data.songs[old];
-
-		this.addSong(song);
+	songOrder(order) {
+		this.data.order = order;
 	}
 }
 
@@ -808,6 +908,7 @@ let Notification = new class extends Loadable {
 			}
 		}
 		catch(e) {
+			Notification.error(json);
 			this.error(json);
 		}
 	}
@@ -859,9 +960,10 @@ class GUI {
 			throw new Error('missing "rootElement"');
 		}
 
-		this.songAddListener = [];
-		this.songChangeListener = [];
-		this.songRemoveListener = [];
+		this.addSongListener = [];
+		this.downloadSongListener = [];
+		this.removeSongListener = [];
+		this.songOrderListener = [];
 
 		rootElement.on('contextmenu', e => e.preventDefault());
 
@@ -881,6 +983,39 @@ class GUI {
 
 		this.search = new element('input').parent(search);
 		let searchResults = new element('ul').parent(search);
+		let searchRequest = fulltext => {
+			if(!Account.isLoggedIn) {
+				searchResults.clear();
+				Notification.error('Please log in');
+				return;
+			}
+
+			let subject = this.search.value().trim();
+
+			if(!subject) {
+				searchResults.clear();
+			}
+			else {
+				AJAX.post('rest.php?search' + (fulltext ? '&text' : ''), {
+					subject: subject
+				}).success(r => {
+					searchResults.clear();
+
+					JSON.parse(r).forEach(song => {
+						new element('li').text('(' + song.songNumber + ') ' + song.title).parent(searchResults).on('mousedown', e => {
+							CCLISong.download(song.songNumber).success(r => {
+								this.downloadSongListener.forEach(fn => {
+									fn(r);
+								})
+							});
+						});
+					});
+				}).error(r => {
+					searchResults.clear();
+					Notification.rest(r);
+				});
+			}
+		};
 
 		this.search.on('drop', e => {
 			let text = e.dataTransfer.getData('text/plain');
@@ -888,62 +1023,12 @@ class GUI {
 			if(text) {
 				this.search.value(text);
 			}
-		});
-
-		this.search.on('input', e => {
-			searchResults.clear();
-
-			if(!Account.isLoggedIn) {
-				Notification.error('Please log in');
-				return ;
-			}
-
-			let subject = this.search.value().trim();
-
-			if(subject) {
-				AJAX.post('rest.php?search', {
-					subject: subject
-				}).success(r => {
-					let json = JSON.parse(r);
-
-
-					json.forEach(song => {
-						new element('li').text('(' + song.songNumber + ') ' + song.title).parent(searchResults).on('mousedown', e => {
-							// ToDo
-							CCLISong.download(song.songNumber).success(r => {
-								this.addSong(r);
-							});
-						});
-					});
-				}).error(r => {
-					// ToDo
-					console.error(r);
-				});
-			}
-		});
-		this.search.on('keypress', e => {
+		}).on('input', e => {
+			searchRequest();
+		}).on('keypress', e => {
 			switch(e.key) {
 				case 'Enter':
-					let subject = this.search.value().trim();
-
-					if(subject) {
-						AJAX.post('rest.php?search&text', {
-							subject: subject
-						}).success(r => {
-							let json = JSON.parse(r);
-							searchResults.clear();
-
-							json.forEach(song => {
-								new element('li').text('(' + song.songNumber + ') ' + song.title).parent(searchResults).on('click', e => {
-									// ToDo
-									console.log(song.songNumber)
-								});
-							});
-						}).error(r => {
-							// ToDo
-							console.error(r);
-						});
-					}
+					searchRequest(true);
 					break;
 			}
 		});
@@ -1006,19 +1091,29 @@ class GUI {
 		};
 	}
 
-	addSongAddListener(fn) {
-		this.songAddListener.push(fn);
+	addSubscriber(fn) {
+		if(fn) {
+			fn({
+				addSong: fn => {
+					this.addSongListener.push(fn);
+				},
+				downloadSong: fn => {
+					this.downloadSongListener.push(fn);
+				},
+				removeSong: fn => {
+					this.removeSongListener.push(fn);
+				},
+				songOrder: fn => {
+					this.songOrderListener.push(fn);
+				}
+			});
+		}
+
 		return this;
 	}
 
-	addSongChangeListener(fn) {
-		this.songChangeListener.push(fn);
-		return this;
-	}
-
-	addSongRemoveListener(fn) {
-		this.songRemoveListener.push(fn);
-		return this;
+	changeHandler(fn) {
+		fn.addSong(fn => this.addSong(fn));
 	}
 
 	addSong(song) {
@@ -1052,8 +1147,19 @@ class GUI {
 			.on('dragend', () => {
 				this.songToMove.classList.remove('dragged');
 				this.songToMove = null;
+
+				let order = [];
+
+				Array.from(this.elementSongs.children).forEach(child => {
+					order.push(child.getAttribute('data-number'));
+				});
+
+				this.songOrderListener.forEach(fn => {
+					fn(order);
+				});
 			})
 			.attribute('draggable', 'true')
+			.attribute('data-number', song.id)
 			.parent(this.elementSongs);
 
 		new element('button').class('close').tooltip('remove').parent(li).listener('click', e => {
@@ -1063,15 +1169,18 @@ class GUI {
 				return;
 			}
 
-			li.remove();
-			this.songRemoveListener.forEach(fn => {
-				fn(song);
+			this.removeSongListener.forEach(fn => {
+				fn(li.index, song);
 			});
+
+			li.remove();
 		});
 
-		this.songAddListener.forEach(fn => {
+		this.addSongListener.forEach(fn => {
 			fn(song);
 		});
+
+		return song;
 	}
 
 	addLine(block, line) {
@@ -1307,10 +1416,6 @@ class GUI {
 				newOrder = song.initialOrder;
 			}
 
-			this.songChangeListener.forEach(fn => {
-				fn('order', song, newOrder);
-			})
-
 			song.saveOrder(newOrder);
 
 			if(Config.get('reloadSongAfterEdit', false)) {
@@ -1342,7 +1447,7 @@ class GUI {
 				.attribute('key', k)
 		});
 
-		Modal.show('Configuration', table).width('400px').resizable('173px').onApply(r => {
+		Modal.show('Configuration', table).width('520px').resizable('173px').onApply(r => {
 			Array.from(table.getElementsByTagName('td')).forEach(td => {
 				let key = td.getAttribute('key');
 
@@ -1421,7 +1526,7 @@ class Song {
 			order: []
 		}, obj);
 
-		this.changeListenerId = [];
+		this.changeListener = [];
 
 		this.title = obj.title;
 		this.id = obj.songNumber;
@@ -1432,7 +1537,7 @@ class Song {
 
 	toJSON() {
 		let obj = { ...this };
-		delete obj.changeListenerId;
+		delete obj.changeListener;
 		return obj;
 	}
 
@@ -1440,8 +1545,8 @@ class Song {
 		let old = this.songNumber;
 		this.songNumber = id;
 
-		this.changeListenerId.forEach(fn => {
-			fn(this, old);
+		this.changeListener.forEach(fn => {
+			fn('songId', this, old);
 		});
 	}
 
@@ -1473,8 +1578,8 @@ class Song {
 		return '';
 	}
 
-	addChangeListenerId(fn) {
-		this.changeListenerId.push(fn);
+	addSubscriber(fn) {
+		this.changeListener.push(fn);
 		return this;
 	}
 
@@ -1492,6 +1597,11 @@ class Song {
 		}
 
 		this.blocks[type] = block;
+
+		this.changeListener.forEach(fn => {
+			fn('songBlockAdd', this, type);
+		});
+
 		return this;
 	}
 
@@ -1503,6 +1613,10 @@ class Song {
 
 			this.initialOrder = this.initialOrder.filter(filter);
 			this.order = this.order.filter(filter);
+
+			this.changeListener.forEach(fn => {
+				fn('songBlockRemove', this, type);
+			});
 		}
 
 		return this;
@@ -1511,6 +1625,10 @@ class Song {
 	saveOrder(order) {
 		this.order = order;
 		return this;
+	}
+
+	exists() {
+		throw new Error('Child class needs to implement the method "exists"');
 	}
 
 	upload() {
@@ -1601,6 +1719,25 @@ class CCLISong extends Song {
 
 	get license() {
 		return 'CCLI-Liednummer ' + this.songNumber + '<br />CCLI-Lizenznummer ' +  this.account;
+	}
+
+	exists(existent, nonexistent) {
+		AJAX.get('rest.php?exists=' + this.songNumber).success(r => {
+			switch(r) {
+				case 'EXISTING':
+					existent(this);
+					break;
+				case 'MISSING':
+					nonexistent(this);
+					break;
+				default:
+					Notification.rest(r);
+			}
+		}).error(r => {
+			Notification.rest(r);
+		});
+
+		return this;
 	}
 
 	upload() {

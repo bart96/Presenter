@@ -56,6 +56,19 @@
 			die;
 		}
 
+		if(isset($_GET['exists'])) {
+			if(!ctype_digit($_GET['exists'])) {
+				RestResult::s500('"exists" is not a number');
+			}
+
+			require_once('Account.php');
+			Account::checkLogin();
+
+			require_once('Song.php');
+			echo Song::has(Account::getAccount(), intval($_GET['exists'])) ? 'EXISTING' : 'MISSING';
+			die;
+		}
+
 		if(isset($_GET['login'])) {
 			if(!isset($_POST['mail']) || strlen($_POST['mail']) < 4) {
 				RestResult::s500('"mail" is missing');
