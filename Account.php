@@ -232,6 +232,81 @@
 		public static function getSongs($songNumbers) {
 			return $songNumbers;
 		}
+
+		/**
+		 * @param string $show
+		 * @param string $order
+		 * @throws LoginException
+		 */
+		public static function saveShow(string $show, string $order) {
+			self::checkLogin();
+
+			$stmt = self::prepare('
+				REPLACE INTO `shows` (
+					`account`, `title`, `order`
+				) VALUES (
+					?, ?, ?
+				)			
+			');
+
+			$stmt->bind_param('iss', self::$account, $show, $order);
+			$stmt->execute();
+			$stmt->close();
+		}
+
+		/**
+		 * @return array
+		 * @throws LoginException
+		 */
+		public static function getShows() {
+			self::checkLogin();
+
+			$stmt = self::prepare('
+				SELECT `title`
+				FROM `shows`
+				WHERE `account` = ?
+				ORDER BY `date` DESC
+			');
+
+			$stmt->bind_param('i', self::$account);
+			$stmt->execute();
+			$stmt->bind_result($title);
+
+			$shows = [];
+
+			while($stmt->fetch()) {
+				array_push($shows, $title);
+			}
+
+			$stmt->close();
+
+			return $shows;
+		}
+
+		public static function getShow(string $title) {
+			$stmt = self::prepare('
+				SELECT `order`
+				FROM `shows`
+				WHERE `account` = ?
+				AND `title` = ?
+			');
+
+			$result = false;
+
+			$stmt->bind_param('is', self::$account, $title);
+			$stmt->execute();
+			$stmt->bind_result($order);
+
+			if($stmt->fetch()) {
+				$result = [
+					'order' => explode(',', $order)
+				];
+			}
+
+			$stmt->close();
+
+			return $result;
+		}
 	}
 
 	session_start();

@@ -589,9 +589,7 @@ class Storage extends Storable {
 			order: []
 		});
 
-		this.addSongListener = [];
-		this.changeSongListener = [];
-		this.removeSongListener = [];
+		this.subscribers = [];
 	}
 
 	convert(data) {
@@ -607,9 +605,7 @@ class Storage extends Storable {
 
 				for(let i in data.order) {
 					this.data.order.push(data.order[i]);
-					this.addSongListener.forEach(fn => {
-						fn(this.data.songs[data.order[i]]);
-					});
+					this.notifySubscriber('addSong', this.data.songs[data.order[i]]);
 				}
 				break;
 			default:
@@ -641,26 +637,38 @@ class Storage extends Storable {
 
 	addSubscriber(fn) {
 		if(fn) {
-			fn({
-				addSong: fn => {
-					this.addSongListener.push(fn);
-				},
-				changeSong: fn => {
-					this.changeSongListener.push(fn);
-				},
-				removeSong: fn => {
-					this.removeSongListener.push(fn);
-				}
-			});
+			this.subscribers.push(fn);
 		}
 
 		return this;
 	}
 
-	changeHandler(fn) {
-		fn.downloadSong(song => this.addSong(song));
-		fn.removeSong((index, song) => this.removeSong(index, song));
-		fn.songOrder(order => this.songOrder(order));
+	notifySubscriber() {
+		this.subscribers.forEach(fn => fn(... arguments));
+	}
+
+	get changeHandler() {
+		return function(type) {
+			let params = Array.from(arguments).slice(1);
+
+			switch(type) {
+				case 'downloadSong':
+					this.addSong(... params);
+					break;
+				case 'removeSong':
+					this.removeSong(... params);
+					break;
+				case 'songOrder':
+					this.songOrder(... params);
+					break;
+				case 'uploadShow':
+					this.uploadShow(... params);
+					break;
+				case 'downloadShow':
+					this.downloadShow(... params);
+					break;
+			}
+		}.bind(this);
 	}
 
 	addSong(song) {
@@ -674,9 +682,7 @@ class Storage extends Storable {
 			song.addSubscriber((type, song) => this.changeSong(type, song));
 		}
 
-		this.addSongListener.forEach(fn => {
-			fn(song);
-		});
+		this.notifySubscriber('addSong', song);
 
 		return song;
 	}
@@ -693,15 +699,13 @@ class Storage extends Storable {
 				console.log(type, song, value);
 		}
 
-		this.changeSongListener.forEach(fn => {
-			fn(type, song, value);
-		});
+		this.notifySubscriber('changeSong', song, value);
 
 		return song;
 	}
 
 	removeSong(index, song) {
-		if(index < 0 || index >= this.data.order.length) {
+		if(index < 0 || index >= this.data.order.length || !this.data.songs[song.id]) {
 			return song;
 		}
 
@@ -709,10 +713,7 @@ class Storage extends Storable {
 
 		let number = this.data.order.splice(index, 1).pop();
 		if(!this.data.order.includes(number)) {
-			this.removeSongListener.forEach(fn => {
-				fn(song);
-			});
-
+			this.notifySubscriber('removeSong', song);
 			delete this.data.songs[song.id];
 		}
 
@@ -721,6 +722,61 @@ class Storage extends Storable {
 
 	songOrder(order) {
 		this.data.order = order;
+	}
+
+	uploadShow(show) {
+		AJAX.post('rest.php?shows=upload', {
+			data: JSON.stringify({
+				show: show,
+				order: this.data.order
+			})
+		}).success(r => {
+			Notification.rest(r);
+		}).error(r => {
+			Notification.rest(r);
+		});
+	}
+
+	downloadShow(show) {
+		AJAX.get('rest.php?shows=download&title=' + encodeURIComponent(show)).success(r => {
+			let json = JSON.parse(r);
+
+			if(!json.order) {
+				return;
+			}
+
+			let $ = this;
+			this.notifySubscriber('clearSongs');
+			this.data.order = [];
+			this.data.songs = {};
+
+			let songs = Array.from(new Set(json.order));
+
+			function downloadsCompleted() {
+				json.order.forEach(id => {
+					$.addSong({id: id});
+				});
+			}
+
+			function downloadJob() {
+				if(!songs.length) {
+					downloadsCompleted();
+					return;
+				}
+
+				CCLISong.download(songs.shift()).success(song => {
+					$.data.songs[song.id] = song;
+					downloadJob();
+				}).error(r => {
+					Notification.rest(r);
+					downloadJob();
+				});
+			}
+
+			downloadJob();
+		}).error(r => {
+			Notification.rest(r);
+		});
 	}
 }
 
@@ -803,6 +859,7 @@ let Modal = new class {
 let Account = new class {
 	constructor() {
 		this.isLoggedIn = false;
+		this.subscribers = [];
 		this.data = Object.assign({
 			mail: '',
 			license: 0
@@ -817,6 +874,18 @@ let Account = new class {
 		return this.data.license;
 	}
 
+	addSubscriber(fn) {
+		if(fn) {
+			this.subscribers.push(fn);
+		}
+
+		return this;
+	}
+
+	notifySubscriber() {
+		this.subscribers.forEach(fn => fn(... arguments));
+	}
+
 	request(success) {
 		AJAX.post('rest.php?login', this.data).success(r => {
 			this.isLoggedIn = true;
@@ -825,9 +894,13 @@ let Account = new class {
 			if(success) {
 				success(r);
 			}
+
+			this.notifySubscriber('login', this.isLoggedIn);
 		}).error(r => {
 			this.isLoggedIn = false;
-			Notification.rest(r)
+			Notification.rest(r);
+
+			this.notifySubscriber('login', this.isLoggedIn);
 		});
 	}
 
@@ -960,10 +1033,7 @@ class GUI {
 			throw new Error('missing "rootElement"');
 		}
 
-		this.addSongListener = [];
-		this.downloadSongListener = [];
-		this.removeSongListener = [];
-		this.songOrderListener = [];
+		this.subscribers = [];
 
 		rootElement.on('contextmenu', e => e.preventDefault());
 
@@ -979,6 +1049,61 @@ class GUI {
 		});
 		this.account = new element('li').class('account').parent(this.elementNav).on('click', e => {
 			Account.login();
+		});
+
+		this.save = new element('li').class('save').on('mouseenter', e => {
+			AJAX.get('rest.php?shows').success(r => {
+				container.clear();
+				newShow.parent(container);
+
+				JSON.parse(r).forEach(show => {
+					let li = new element('li').text(show).parent(container);
+					new element('button').class('download').tooltip('download').parent(li).on('click', e => {
+						this.notifySubscriber('downloadShow', show);
+					});
+					new element('button').class('upload').tooltip('upload').parent(li).on('click', e => {
+						this.notifySubscriber('uploadShow', show);
+					});
+				});
+			}).error(r => {
+				this.save.remove();
+				Notification.rest(r);
+			});
+		});
+		let container = new element('ul').parent(this.save);
+		let newShow = new element('li').parent(container).text('New show');
+		new element('button').class('upload').tooltip('upload').parent(newShow).on('click', e => {
+			let d = new Date();
+			let format = Config.get('ShowSaveFormat', 'Show {dd}.{MM}.{yyyy} {HH}:{mm}');
+
+			function z(n) {
+				return ((n < 10) ? '0' : '') + n;
+			}
+
+			let show = format
+				.replace(/\{yyyy}/g, d.getFullYear())
+				.replace(/\{MM}/g, z(d.getMonth()))
+				.replace(/\{dd}/g, z(d.getDay()))
+				.replace(/\{HH}/g, z(d.getHours()))
+				.replace(/\{mm}/g, z(d.getMinutes()))
+				.replace(/\{ss}/g, z(d.getSeconds()));
+
+			show = prompt('Name of the show', show);
+
+			if(!show) {
+				return;
+			}
+
+			this.notifySubscriber('uploadShow', show);
+		});
+
+		Account.addSubscriber(loggedIn => {
+			if(loggedIn) {
+				this.save.parent(this.elementNav);
+			}
+			else {
+				this.save.remove();
+			}
 		});
 
 		this.search = new element('input').parent(search);
@@ -1004,9 +1129,7 @@ class GUI {
 					JSON.parse(r).forEach(song => {
 						new element('li').text('(' + song.songNumber + ') ' + song.title).parent(searchResults).on('mousedown', e => {
 							CCLISong.download(song.songNumber).success(r => {
-								this.downloadSongListener.forEach(fn => {
-									fn(r);
-								})
+								this.notifySubscriber('downloadSong', r);
 							});
 						});
 					});
@@ -1093,27 +1216,29 @@ class GUI {
 
 	addSubscriber(fn) {
 		if(fn) {
-			fn({
-				addSong: fn => {
-					this.addSongListener.push(fn);
-				},
-				downloadSong: fn => {
-					this.downloadSongListener.push(fn);
-				},
-				removeSong: fn => {
-					this.removeSongListener.push(fn);
-				},
-				songOrder: fn => {
-					this.songOrderListener.push(fn);
-				}
-			});
+			this.subscribers.push(fn);
 		}
 
 		return this;
 	}
 
-	changeHandler(fn) {
-		fn.addSong(fn => this.addSong(fn));
+	notifySubscriber() {
+		this.subscribers.forEach(fn => fn(... arguments));
+	}
+
+	get changeHandler() {
+		return function(type) {
+			let params = Array.from(arguments).slice(1);
+
+			switch(type) {
+				case 'addSong':
+					this.addSong(... params);
+					break;
+				case 'clearSongs':
+					this.elementSongs.clear();
+					break;
+			}
+		}.bind(this);
 	}
 
 	addSong(song) {
@@ -1154,9 +1279,7 @@ class GUI {
 					order.push(child.getAttribute('data-number'));
 				});
 
-				this.songOrderListener.forEach(fn => {
-					fn(order);
-				});
+				this.notifySubscriber('songOrder', order);
 			})
 			.attribute('draggable', 'true')
 			.attribute('data-number', song.id)
@@ -1169,16 +1292,12 @@ class GUI {
 				return;
 			}
 
-			this.removeSongListener.forEach(fn => {
-				fn(li.index, song);
-			});
+			this.notifySubscriber('removeSong', li.index, song);
 
 			li.remove();
 		});
 
-		this.addSongListener.forEach(fn => {
-			fn(song);
-		});
+		this.notifySubscriber('addSong', song);
 
 		return song;
 	}
@@ -1216,6 +1335,7 @@ class GUI {
 		this.elementNav.clear();
 		this.config.parent(this.elementNav);
 		this.account.parent(this.elementNav);
+		this.save.parent(this.elementNav);
 		this.elementControl.clear();
 		this.elementPreview.clear();
 		this.switchActive(this.elementSongs, li);
@@ -1553,7 +1673,20 @@ class Song {
 	get id() {
 		return this.songNumber;
 	}
+/*
+	set title(title) {
+		let old = this.title;
+		this.title = title;
 
+		this.changeListener.forEach(fn => {
+			fn('songTitle', this, old);
+		});
+	}
+
+	get title() {
+		return this.title;
+	}
+*/
 	get text() {
 		let text = [];
 
@@ -1693,18 +1826,24 @@ class CCLISong extends Song {
 			success(new CCLISong(obj));
 		}).error(error);
 
-		return {
+		let result = {
 			success: fn => {
 				if(fn) {
 					success = fn;
 				}
+
+				return result;
 			},
 			error: fn => {
 				if(fn) {
 					error = fn;
 				}
+
+				return result;
 			}
 		}
+
+		return result;
 	}
 
 	constructor(obj) {

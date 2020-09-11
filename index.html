@@ -16,9 +16,13 @@
 		let storage = new Storage();
 		let gui = new GUI(e);
 
-		storage.addSubscriber(fn => gui.changeHandler(fn));
-		gui.addSubscriber(fn => storage.changeHandler(fn));
+		storage.addSubscriber(gui.changeHandler);
+		gui.addSubscriber(storage.changeHandler);
 
+		/*
+		storage.addSubscriber(() => gui.changeHandler(... arguments));
+		gui.addSubscriber(() => storage.changeHandler(... arguments));
+*/
 		new DragNDrop(e, ['text/plain'], 'over').onFileLoaded(text => {
 			CCLISong.parse(text).exists(s => {
 				let message = 'The song "' + s.title + '" with number "' + s.songNumber

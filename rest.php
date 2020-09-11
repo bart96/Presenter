@@ -56,6 +56,43 @@
 			die;
 		}
 
+		if(isset($_GET['shows'])) {
+			require_once('Account.php');
+			Account::checkLogin();
+
+			switch($_GET['shows']) {
+				case 'upload':
+					if(!isset($_POST['data'])) {
+						RestResult::s500('"data" is missing');
+					}
+
+					$data = json_decode($_POST['data'], true);
+
+					if(!isset($data['show'])) {
+						RestResult::s500('Couldn\'t find "show" in "data"');
+					}
+
+					if(!isset($data['order'])) {
+						RestResult::s500('Couldn\'t find "order" in "data"');
+					}
+
+					Account::saveShow($data['show'], join(',', $data['order']));
+					RestResult::s200('Show successfully uploaded');
+					break;
+				case 'download':
+					if(!isset($_GET['title'])) {
+						RestResult::s500('"title" is missing');
+					}
+
+					echo json_encode(Account::getShow($_GET['title']));
+					break;
+				default:
+					echo json_encode(Account::getShows());
+			}
+
+			die;
+		}
+
 		if(isset($_GET['exists'])) {
 			if(!ctype_digit($_GET['exists'])) {
 				RestResult::s500('"exists" is not a number');
@@ -95,7 +132,7 @@
 	catch(LoginException $e) {
 		RestResult::s403($e->getMessage());
 	}
-	catch(InvalidArgumentException $e) {
+	catch(Exception $e) {
 		RestResult::s500($e->getMessage());
 	}
 

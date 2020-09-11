@@ -26,6 +26,15 @@ CREATE TABLE `songs` (
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 
+CREATE TABLE `shows` (
+  `account` int(11) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `order` text NOT NULL
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+COMMIT;
+
+
 
 ALTER TABLE `account`
   ADD PRIMARY KEY (`license`);
@@ -39,5 +48,9 @@ ALTER TABLE `blocks` ADD FULLTEXT KEY `text` (`text`);
 ALTER TABLE `songs`
   ADD PRIMARY KEY (`account`,`songnumber`);
 ALTER TABLE `songs` ADD FULLTEXT KEY `title` (`title`);
+
+
+ALTER TABLE `shows`
+  ADD PRIMARY KEY (`account`,`title`);
 
 COMMIT;
