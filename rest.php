@@ -86,6 +86,12 @@
 
 					echo json_encode(Account::getShow($_GET['title']));
 					break;
+				case 'delete':
+					if(!isset($_GET['title'])) {
+						RestResult::s500('"title" is missing');
+					}
+
+					Account::deleteShow($_GET['title']);
 				default:
 					echo json_encode(Account::getShows());
 			}

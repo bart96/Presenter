@@ -94,8 +94,26 @@ class element {
 	}
 
 	parent(parent) {
-		parent.appendChild(this.element);
+		if(parent && parent.appendChild) {
+			parent.appendChild(this.element);
+		}
+
 		return this;
+	}
+
+	hierarchy(tagName) {
+		tagName = tagName.toUpperCase();
+		let e = this.element;
+
+		while(e && e.parentElement && e.tagName.toUpperCase() !== tagName) {
+			e = e.parentElement;
+		}
+
+		if(e && e.tagName.toUpperCase() === tagName) {
+			return e;
+		}
+
+		return this.element;
 	}
 
 	shiftChild() {
@@ -145,6 +163,10 @@ class element {
 	}
 
 	text(text) {
+		if(text === undefined) {
+			return this.element.textContent;
+		}
+
 		this.element.textContent = text;
 		return this;
 	}
@@ -196,6 +218,14 @@ class element {
 
 	on(event, listener) {
 		this.element['on' + event] = listener;
+		return this;
+	}
+
+	ignore(event) {
+		this.element['on' + event] = e => {
+			e.preventDefault();
+			e.stopPropagation();
+		}
 		return this;
 	}
 
@@ -320,9 +350,9 @@ class element {
 }
 
 class DragNDrop {
-	constructor(element, filetypes, dragClass) {
+	constructor(target, filetypes, dragClass, zone) {
 		let $ = this;
-		this.element = element;
+		this.element = target;
 		this.loaded = [];
 		this.errors = [];
 
@@ -340,27 +370,37 @@ class DragNDrop {
 			return false;
 		}
 
-		element.listener('drop', e => {
+		let fileHandler = files => {
+			Array.from(files).forEach(file => {
+				if (filetypes.includes(file.type)) {
+					$.loaded.forEach(fn => {
+						let reader = new FileReader();
+						reader.addEventListener('load', e => {
+							fn(e.target.result);
+						});
+						reader.readAsText(file);
+					});
+				} else {
+					$.errors.forEach(fn => {
+						fn('Filetype "' + file.type + '" for file "' + file.name + '" not supported');
+					});
+				}
+			});
+		}
+
+		if(zone) {
+			new element('input').type('file').id('file').parent(zone).listener('change', e => {
+				fileHandler(e.target.files);
+			});
+			new element('label').attribute('for', 'file').parent(zone);
+		}
+
+		target.listener('drop', e => {
 			e.stopPropagation();
 			e.preventDefault();
 
 			if(e.dataTransfer.files) {
-				Array.from(e.dataTransfer.files).forEach(file => {
-					if(filetypes.includes(file.type)) {
-						$.loaded.forEach(fn => {
-							let reader = new FileReader();
-							reader.addEventListener('load', e => {
-								fn(e.target.result);
-							});
-							reader.readAsText(file);
-						});
-					}
-					else {
-						$.errors.forEach(fn => {
-							fn('Filetype "' + file.type + '" for file "' + file.name + '" not supported');
-						});
-					}
-				});
+				fileHandler(e.dataTransfer.files);
 			}
 			else {
 				$.errors.forEach(fn => {
@@ -373,7 +413,7 @@ class DragNDrop {
 			}
 		});
 
-		element.listener('dragover', e => {
+		target.listener('dragover', e => {
 			if(!containsFiles(e)) {
 				return;
 			}
@@ -388,7 +428,7 @@ class DragNDrop {
 		});
 
 		if(dragClass) {
-			element.listener('dragleave', e => {
+			target.listener('dragleave', e => {
 				$.element.classList.remove(dragClass);
 			});
 		}
@@ -532,8 +572,6 @@ let AJAX = new (function() {
 })();
 
 class Storable extends Loadable {
-	static instances = [];
-
 	constructor(itemName, data) {
 		super();
 
@@ -580,6 +618,8 @@ class Storable extends Loadable {
 		}
 	}
 }
+
+Storable.instances = [];
 
 class Storage extends Storable {
 	constructor() {
@@ -666,6 +706,9 @@ class Storage extends Storable {
 					break;
 				case 'downloadShow':
 					this.downloadShow(... params);
+					break;
+				case 'deleteShow':
+					this.deleteShow(... params);
 					break;
 			}
 		}.bind(this);
@@ -778,6 +821,12 @@ class Storage extends Storable {
 			Notification.rest(r);
 		});
 	}
+
+	deleteShow(show) {
+		AJAX.get('rest.php?shows=delete&title=' + encodeURIComponent(show)).error(r => {
+			Notification.rest(r);
+		});
+	}
 }
 
 let Modal = new class {
@@ -786,10 +835,7 @@ let Modal = new class {
 		this.modal = new element('div').class('modal');
 		this.callback = null;
 
-		this.container = new element('div').class('container').parent(this.modal).on('contextmenu', e => {
-			e.stopPropagation();
-			e.preventDefault();
-		});
+		this.container = new element('div').class('container').parent(this.modal).ignore('contextmenu');
 		let header = new element('header').parent(this.container);
 		this.content = new element('div').class('content').parent(this.container);
 		this.footer = new element('footer').parent(this.container);
@@ -799,7 +845,7 @@ let Modal = new class {
 			this.close();
 		});
 
-		new element('button').type('submit').text('OK').parent(this.footer).on('click', e => {
+		this.apply = new element('button').type('submit').text('OK').on('click', e => {
 			this.close();
 
 			if(this.callback) {
@@ -819,6 +865,9 @@ let Modal = new class {
 		this.content.removeClass('resizable').height('auto').clear();
 		this.footer.style('display', hideFooter ? 'none' : 'block');
 
+		this.footer.clear();
+		this.apply.parent(this.footer);
+
 		this.content.appendChild(element);
 		this.modal.class('show');
 
@@ -836,11 +885,19 @@ let Modal = new class {
 	}
 
 	width(width) {
+		if(width.endsWith('px') && parseInt(width.slice(0, -2)) > window.innerWidth) {
+			width = window.innerWidth + 'px';
+		}
+
 		this.container.width(width);
 		return this;
 	}
 
 	height(height) {
+		if(height.endsWith('px') && parseInt(height.slice(0, -2)) > window.innerHeight) {
+			height = window.innerHeight + 'px';
+		}
+
 		this.content.height(height);
 		return this;
 	}
@@ -851,6 +908,16 @@ let Modal = new class {
 		if(initialHeight) {
 			this.height(initialHeight);
 		}
+
+		return this;
+	}
+
+	foot(... elements) {
+		this.footer.clear();
+
+		elements.forEach(element => {
+			element.parent(this.footer);
+		});
 
 		return this;
 	}
@@ -1051,50 +1118,65 @@ class GUI {
 			Account.login();
 		});
 
-		this.save = new element('li').class('save').on('mouseenter', e => {
-			AJAX.get('rest.php?shows').success(r => {
-				container.clear();
-				newShow.parent(container);
+		this.save = new element('li').class('shows').on('click', e => {
+			let wrapper = new element('ul').class('shows');
 
-				JSON.parse(r).forEach(show => {
-					let li = new element('li').text(show).parent(container);
-					new element('button').class('download').tooltip('download').parent(li).on('click', e => {
-						this.notifySubscriber('downloadShow', show);
-					});
-					new element('button').class('upload').tooltip('upload').parent(li).on('click', e => {
-						this.notifySubscriber('uploadShow', show);
-					});
-				});
-			}).error(r => {
-				this.save.remove();
-				Notification.rest(r);
+			let newShow = new element('button').class('upload').text('New show').on('click', e => {
+				let d = new Date();
+				let format = Config.get('ShowSaveFormat', 'Show {dd}.{MM}.{yyyy}');
+
+				function z(n) {
+					return ((n < 10) ? '0' : '') + n;
+				}
+
+				let show = format
+					.replace(/\{yyyy}/g, d.getFullYear())
+					.replace(/\{MM}/g, z(d.getMonth() + 1))
+					.replace(/\{dd}/g, z(d.getDate()))
+					.replace(/\{HH}/g, z(d.getHours()))
+					.replace(/\{mm}/g, z(d.getMinutes()))
+					.replace(/\{ss}/g, z(d.getSeconds()));
+
+				show = prompt('Name of the show', show);
+
+				if(!show) {
+					return;
+				}
+
+				this.notifySubscriber('uploadShow', show);
+				loadShows(this);
 			});
-		});
-		let container = new element('ul').parent(this.save);
-		let newShow = new element('li').parent(container).text('New show');
-		new element('button').class('upload').tooltip('upload').parent(newShow).on('click', e => {
-			let d = new Date();
-			let format = Config.get('ShowSaveFormat', 'Show {dd}.{MM}.{yyyy} {HH}:{mm}');
 
-			function z(n) {
-				return ((n < 10) ? '0' : '') + n;
+			function loadShows($) {
+				AJAX.get('rest.php?shows').success(r => {
+					wrapper.clear();
+
+					JSON.parse(r).forEach(show => {
+						let li = new element('li').text(show).parent(wrapper).on('dblclick', e => {
+							$.notifySubscriber('downloadShow', show);
+							Modal.close();
+						});
+
+						new element('button').type('button').class('upload').tooltip('upload').parent(li).on('click', e => {
+							$.notifySubscriber('uploadShow', show);
+							loadShows($);
+						});
+
+						new element('button').type('button').text('×').tooltip('delete').parent(li).on('click', e => {
+							if(!Config.get('confirmShowDeletion', true) || confirm('Delete show?')) {
+								$.notifySubscriber('deleteShow', show);
+								li.remove();
+							}
+						});
+					});
+				}).error(r => {
+					this.save.remove();
+					Notification.rest(r);
+				});
 			}
 
-			let show = format
-				.replace(/\{yyyy}/g, d.getFullYear())
-				.replace(/\{MM}/g, z(d.getMonth()))
-				.replace(/\{dd}/g, z(d.getDay()))
-				.replace(/\{HH}/g, z(d.getHours()))
-				.replace(/\{mm}/g, z(d.getMinutes()))
-				.replace(/\{ss}/g, z(d.getSeconds()));
-
-			show = prompt('Name of the show', show);
-
-			if(!show) {
-				return;
-			}
-
-			this.notifySubscriber('uploadShow', show);
+			loadShows(this);
+			Modal.show('Shows', wrapper).width('350px').foot(newShow);
 		});
 
 		Account.addSubscriber(loggedIn => {
@@ -1243,11 +1325,6 @@ class GUI {
 
 	addSong(song) {
 		let li = new element('li')
-			.text(song.title)
-			.on(Config.get('songClickBehaviour', 'dblclick'), () => this.showSong(song, li))
-			.on('contextmenu', e => {
-				this.editSong(song, li);
-			})
 			.on('dragstart', e => {
 				this.songToMove = li;
 				this.songToMove.class('dragged');
@@ -1262,11 +1339,18 @@ class GUI {
 				e.preventDefault();
 				e.dataTransfer.dropEffect = 'move';
 
-				if(this.songToMove.isBefore(e.target)) {
-					this.songToMove.before(e.target);
+				let target = e.target;
+				while(target.tagName.toUpperCase() !== 'LI' && target.parentElement) {
+					target = target.parentElement;
 				}
-				else {
-					this.songToMove.after(e.target);
+
+				if(target.tagName.toUpperCase() === 'LI') {
+					if(this.songToMove.isBefore(target)) {
+						this.songToMove.before(target);
+					}
+					else {
+						this.songToMove.after(target);
+					}
 				}
 			})
 			.on('dragend', () => {
@@ -1285,17 +1369,47 @@ class GUI {
 			.attribute('data-number', song.id)
 			.parent(this.elementSongs);
 
-		new element('button').class('close').tooltip('remove').parent(li).listener('click', e => {
-			e.stopPropagation();
+		new element('span')
+			.text(song.title)
+			.on(Config.get('songClickBehaviour', 'dblclick'), e => {
+				e.stopPropagation();
+				e.preventDefault();
 
-			if(Config.get('confirmDelete', false) && !confirm('Do you really want to remove the song?')) {
-				return;
-			}
+				this.showSong(song, li);
+			})
+			.on('contextmenu', e => {
+				e.preventDefault();
+				this.editSong(song, li);
+			})
+			.on('touchstart', e => {
+				window.touchStartTimer = Date.now();
+			})
+			.on('touchend', e => {
+				e.preventDefault();
 
-			this.notifySubscriber('removeSong', li.index, song);
+				if(Date.now() - window.touchStartTimer > parseInt(Config.get('TouchDuration', 300))) {
+					this.editSong(song, li);
+				}
+				else {
+					this.showSong(song, li);
+				}
+			})
+			.parent(li);
 
-			li.remove();
-		});
+		new element('button').class('close').tooltip('remove').parent(li)
+			.on('click', e => {
+				e.preventDefault();
+				e.stopPropagation();
+
+				if(Config.get('confirmDelete', false) && !confirm('Do you really want to remove the song?')) {
+					return;
+				}
+
+				this.notifySubscriber('removeSong', li.index, song);
+
+				li.remove();
+			})
+			.ignore('contextmenu');
 
 		this.notifySubscriber('addSong', song);
 
@@ -1304,6 +1418,9 @@ class GUI {
 
 	addLine(block, line) {
 		let controlLine = new element('p').parent(block).html(line).listener(Config.get('verseClickBehaviour', 'dblclick'), e => {
+			e.preventDefault();
+			e.stopPropagation();
+
 			let lines = Array.from(this.elementControl.getElementsByTagName('p'));
 			this.current.index = lines.indexOf(controlLine.element);
 
@@ -1428,6 +1545,9 @@ class GUI {
 
 				$.switchActive(ul, li);
 			}).on('dblclick', e => {
+				e.preventDefault();
+				e.stopPropagation();
+
 				let currentText = editOrder.value();
 				let insertText = li.element.textContent;
 				let nextPart = currentText.indexOf(' | ', orderCursorPosition);

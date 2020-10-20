@@ -283,7 +283,14 @@
 			return $shows;
 		}
 
+		/**
+		 * @param string $title
+		 * @return array|false
+		 * @throws LoginException
+		 */
 		public static function getShow(string $title) {
+			self::checkLogin();
+
 			$stmt = self::prepare('
 				SELECT `order`
 				FROM `shows`
@@ -306,6 +313,24 @@
 			$stmt->close();
 
 			return $result;
+		}
+
+		/**
+		 * @param $title
+		 * @throws LoginException
+		 */
+		public static function deleteShow($title) {
+			self::checkLogin();
+
+			$stmt = self::prepare('
+				DELETE FROM `shows`
+				WHERE `account` = ?
+				AND `title` = ?
+			');
+
+			$stmt->bind_param('is', self::$account, $title);
+			$stmt->execute();
+			$stmt->close();
 		}
 	}
 
