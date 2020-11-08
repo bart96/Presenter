@@ -64,6 +64,10 @@ class element {
 		return this.element.nextElementSibling;
 	}
 
+	get rect() {
+		return this.element.getBoundingClientRect();
+	}
+
 	get offsetHeight() {
 		return this.element.offsetHeight;
 	}
@@ -142,6 +146,11 @@ class element {
 		return this;
 	}
 
+	className(className) {
+		this.element.className = className;
+		return this;
+	}
+
 	class(... classes) {
 		this.element.classList.add(... classes);
 		return this;
@@ -172,8 +181,12 @@ class element {
 	}
 
 	html(html) {
-		this.element.innerHTML = html;
-		return this;
+		if(html) {
+			this.element.innerHTML = html;
+			return this;
+		}
+
+		return this.element.innerHTML;
 	}
 
 	value(value) {
@@ -292,6 +305,16 @@ class element {
 		return this;
 	}
 
+	focus() {
+		this.element.focus();
+		return this;
+	}
+
+	select() {
+		this.element.select();
+		return this;
+	}
+
 	height(height) {
 		this.element.style.height = height;
 		return this;
@@ -313,6 +336,18 @@ class element {
 		}
 
 		return this;
+	}
+
+	removeChildren(tag) {
+		tag = tag.toUpperCase();
+
+		Array.from(this.element.children).forEach(child => {
+			if(child.tagName.toUpperCase() === tag) {
+				this.element.removeChild(child);
+			}
+		});
+
+		return this
 	}
 
 	clear() {
@@ -768,6 +803,11 @@ class Storage extends Storable {
 	}
 
 	uploadShow(show) {
+		if(this.data.order.length < 1) {
+			Notification.error('You\'ll need to add a song first');
+			return;
+		}
+
 		AJAX.post('rest.php?shows=upload', {
 			data: JSON.stringify({
 				show: show,
@@ -799,6 +839,9 @@ class Storage extends Storable {
 				json.order.forEach(id => {
 					$.addSong({id: id});
 				});
+
+				// ToDO save
+				this.save();
 			}
 
 			function downloadJob() {
@@ -932,7 +975,7 @@ let Account = new class {
 			license: 0
 		}, JSON.parse(localStorage.getItem('account') || '{}'));
 
-		if(!isNaN(parseInt(this.data.license))) {
+		if(this.data.mail && !isNaN(parseInt(this.data.license))) {
 			this.request();
 		}
 	}
@@ -1072,11 +1115,13 @@ let Config = new class extends Storable {
 	}
 
 	set(item, value) {
-		if(value === '') {
-			value = undefined;
+		if(value === '' || value === undefined) {
+			delete this.data[item];
+		}
+		else {
+			this.data[item] = value;
 		}
 
-		this.data[item] = value;
 		return this;
 	}
 
@@ -1094,29 +1139,138 @@ let Config = new class extends Storable {
 	}
 }
 
-class GUI {
+let PopUp = new class {
+	constructor() {
+		this.loaded = [];
+		this.visibility = [];
+		this.popup = null;
+	}
+
+	get inactive() {
+		return !this.popup || this.popup.closed;
+	}
+
+	show() {
+		if(this.inactive) {
+			this.popup = window.open('view.php', '_blank', 'toolbar=no,scrollbars=no,resizable=yes,width=450,height=300');
+
+			if(this.popup) {
+				this.popup.onload = e => {
+					this.loaded.forEach(fn => {
+						fn();
+					});
+				}
+			}
+		}
+		else {
+			this.popup.document.body.classList.toggle('black');
+			this.visibilityUpdate();
+		}
+
+		return this;
+	}
+
+	onLoad(fn) {
+		if(fn) {
+			this.loaded.push(fn);
+		}
+
+		return this;
+	}
+
+	onVisibilityChange(fn) {
+		if(fn) {
+			this.visibility.push(fn);
+		}
+
+		return this;
+	}
+
+	close() {
+		if(!this.inactive) {
+			this.popup.close();
+		}
+
+		return this;
+	}
+
+	updatePopup(id, html, classes, black) {
+		if(this.inactive) {
+			return;
+		}
+
+		this.popup.document.body.id = 'song_' + id;
+
+		let content = this.popup.document.querySelector('#content');
+
+		if(!content) {
+			return;
+		}
+
+		content.className = classes + (black ? ' black' : '');
+		content.innerHTML = html;
+
+		return this;
+	}
+
+	toggleVisibility() {
+		if(this.inactive) {
+			return;
+		}
+
+		this.popup.document.body.classList.toggle('hide');
+		this.visibilityUpdate();
+
+		return this;
+	}
+
+	visibilityUpdate() {
+		this.visibility.forEach(fn => {
+			fn(
+				this.popup.document.body.classList.contains('hide'),
+				this.popup.document.body.classList.contains('black')
+			);
+		});
+	}
+}
+
+class GUI extends Loadable {
 	constructor(rootElement) {
 		if(!rootElement) {
 			throw new Error('missing "rootElement"');
 		}
 
+		super();
 		this.subscribers = [];
 
 		rootElement.on('contextmenu', e => e.preventDefault());
 
-		let search = new element('div').id('search').parent(rootElement);
 		this.elementNav = new element('ul').id('nav').parent(rootElement);
-		this.elementSongs = new element('ul').id('songs').parent(rootElement);
-		this.elementControl = new element('div').id('control').parent(rootElement);
+		this.elementControl = new element('div').class('wrapper').parent(new element('div').id('control').parent(rootElement));
+		this.elementSongs = new element('ul').parent(new element('div').id('songs').parent(rootElement));
 		this.elementPreview = new element('div').id('preview').parent(rootElement)
 			.listener('contextmenu', e => e.preventDefault());
 
-		this.config = new element('li').class('config').parent(this.elementNav).on('click', e => {
-			this.showConfig();
-		});
-		this.account = new element('li').class('account').parent(this.elementNav).on('click', e => {
-			Account.login();
-		});
+		this.expand = new element('div').id('expand').parent(document.body);
+
+		new element('li').class('sidebar').parent(this.elementNav).on('click', e => {
+			let shrunk = !Config.get('shrinkSidebar', false);
+
+			Config.set('shrinkSidebar', shrunk);
+
+			if(shrunk) {
+				document.body.classList.add('shrunk');
+			}
+			else {
+				document.body.classList.remove('shrunk');
+			}
+		}).tooltip('Sidebar');
+		new element('li').class('search').parent(this.elementNav).on('click', e => {
+			if(this.elementNav.classList.toggle('search')) {
+				this.search.focus().select();
+			}
+		}).tooltip('Toggle search');
+		let search = new element('div').id('search').parent(this.elementNav);
 
 		this.save = new element('li').class('shows').on('click', e => {
 			let wrapper = new element('ul').class('shows');
@@ -1176,12 +1330,44 @@ class GUI {
 			}
 
 			loadShows(this);
-			Modal.show('Shows', wrapper).width('350px').foot(newShow);
+			Modal.show('Shows', wrapper).width('350px').resizable('235px').foot(newShow);
+		}).tooltip('Shows');
+
+		this.account = new element('li').class('account').parent(this.elementNav).on('click', e => {
+			Account.login();
+		}).tooltip('Account');
+
+		let window = new element('li').class('popup').parent(this.elementNav).on('click', e => {
+			PopUp.show();
+		}).on('contextmenu', e => {
+			PopUp.toggleVisibility();
+		}).tooltip('Block screen popup');
+
+		PopUp.onLoad(e => {
+			this.updatePopup();
+		}).onVisibilityChange((hide, black) => {
+			if(hide) {
+				window.classList.add('hide');
+			}
+			else {
+				window.classList.remove('hide');
+			}
+
+			if(black) {
+				window.classList.add('black');
+			}
+			else {
+				window.classList.remove('black');
+			}
 		});
+
+		new element('li').class('config').parent(this.elementNav).on('click', e => {
+			this.showConfig();
+		}).tooltip('Configuration');
 
 		Account.addSubscriber(loggedIn => {
 			if(loggedIn) {
-				this.save.parent(this.elementNav);
+				this.save.before(this.account);
 			}
 			else {
 				this.save.remove();
@@ -1245,6 +1431,7 @@ class GUI {
 
 		this.songToMove = null;
 		this.current = {
+			id: -1,
 			index: 1,
 			text: []
 		};
@@ -1258,15 +1445,18 @@ class GUI {
 				case 'Home':
 					this.current.index = 0;
 					this.scrollTo(0);
+					this.updatePopup();
 					break;
 				case 'ArrowUp':
 					if(this.current.index > 0) {
 						this.scrollTo(--this.current.index);
+						this.updatePopup();
 					}
 					break;
 				case 'ArrowDown':
 					if(this.current.index < this.elementPreview.children.length - 1) {
 						this.scrollTo(++this.current.index);
+						this.updatePopup();
 					}
 					break;
 				case 'KeyB':
@@ -1275,6 +1465,7 @@ class GUI {
 					}
 
 					this.elementPreview.classList.toggle('black');
+					this.updatePopup();
 					break;
 				case 'Escape':
 				case 'F10':
@@ -1294,6 +1485,14 @@ class GUI {
 			e.preventDefault();
 			e.stopPropagation();
 		};
+
+		this.addOnLoadListener(() => {
+			if(Config.get('shrinkSidebar', false)) {
+				document.body.classList.add('shrunk');
+			}
+
+			rootElement.attribute('theme', Config.get('theme', 'default|calibration|expert'));
+		});
 	}
 
 	addSubscriber(fn) {
@@ -1365,6 +1564,19 @@ class GUI {
 
 				this.notifySubscriber('songOrder', order);
 			})
+			.on('mouseenter', () => {
+				this.expand.text(song.title);
+				this.expand.style('top', li.rect.top + 'px');
+				this.expand.className('visible');
+
+				if(li.classList.contains('active')) {
+					this.expand.classList.add('active');
+				}
+
+			})
+			.on('mouseleave', () => {
+				this.expand.classList.remove('visible');
+			})
 			.attribute('draggable', 'true')
 			.attribute('data-number', song.id)
 			.parent(this.elementSongs);
@@ -1375,6 +1587,7 @@ class GUI {
 				e.stopPropagation();
 				e.preventDefault();
 
+				this.expand.classList.add('active');
 				this.showSong(song, li);
 			})
 			.on('contextmenu', e => {
@@ -1416,7 +1629,26 @@ class GUI {
 		return song;
 	}
 
+	updatePopup() {
+		if(PopUp.inactive) {
+			return;
+		}
+
+		let active = this.elementControl.querySelector('span.active');
+
+		if(!active) {
+			return;
+		}
+
+		let black = this.elementPreview.classList.contains('black');
+		PopUp.updatePopup(this.current.id, active.innerHTML, active.className, black);
+	}
+
 	addLine(block, line) {
+		if(!line) {
+			line = '<br />';
+		}
+
 		let controlLine = new element('p').parent(block).html(line).listener(Config.get('verseClickBehaviour', 'dblclick'), e => {
 			e.preventDefault();
 			e.stopPropagation();
@@ -1428,6 +1660,8 @@ class GUI {
 				scrollToBlock: false,
 				scrollBehavior: Config.get('verseScrollBehaviour', 'auto')
 			});
+
+			this.updatePopup();
 		});
 
 		if(this.current.text.length < 1) {
@@ -1446,54 +1680,69 @@ class GUI {
 	}
 
 	showSong(song, li) {
+		this.current.id = song.songNumber;
 		this.current.index = 0;
 		this.current.text = [];
 
-		this.elementNav.clear();
-		this.config.parent(this.elementNav);
-		this.account.parent(this.elementNav);
-		this.save.parent(this.elementNav);
 		this.elementControl.clear();
 		this.elementPreview.clear();
 		this.switchActive(this.elementSongs, li);
-		this.elementPreview.classList.remove('black');
+
+		if(Config.get('resetBlackOnSongSwitch', false)) {
+			this.elementPreview.classList.remove('black');
+		}
 
 		song.order.forEach(order => {
-			let block = new element('span').parent(this.elementControl).on('contextmenu', e => {
-				if(block.classList.contains('hidden')) {
-					block.classList.remove('hidden');
-					// TODO show live elements
-				}
-				else {
-					block.classList.add('hidden');
-					// TODO hide live elements (maybe a listener from line to block???)
-				}
-			});
-			let li = new element('li').text(order).parent(this.elementNav).listener('click', e => {
-				let index = Array.from(this.elementControl.getElementsByTagName('p')).indexOf(block.firstElementChild);
-				this.current.index = index;
-				this.scrollTo(index, {
-					scrollBehavior: Config.get('navScrollBehaviour', 'auto')
+			let createBlock = () => {
+				let block = new element('span').parent(this.elementControl).on('contextmenu', e => {
+					/*
+					if(block.classList.contains('hidden')) {
+						block.classList.remove('hidden');
+						// TODO show live elements
+					}
+					else {
+						block.classList.add('hidden');
+						// TODO hide live elements (maybe a listener from line to block???)
+						// ?? change tagname ??
+					}
+					 */
 				});
-			});
-			block.data('nav', li);
 
-			if(this.current.text.length < 1) {
-				block.class('active');
-				li.class('active');
+				let header = new element('h1').text(order).parent(block).listener('click', e => {
+					let index = Array.from(this.elementControl.getElementsByTagName('p')).indexOf(block.querySelector('p'));
+					this.current.index = index;
+					this.scrollTo(index, {
+						scrollBehavior: Config.get('navScrollBehaviour', 'auto')
+					});
+
+					this.updatePopup();
+				});
+				block.data('nav', header);
+
+				if(this.current.text.length < 1) {
+					block.class('active');
+				}
+
+				return block;
 			}
 
-			song.blocks[order].forEach(line => this.addLine(block, line));
+			let block = createBlock();
+
+			song.blocks[order].forEach(line => {
+				if(line === '---') {
+					block = createBlock();
+				}
+				else {
+					this.addLine(block, line);
+				}
+			});
 		});
 
-		let block = new element('span').parent(this.elementControl);
-		if(Config.get('showCopyrightInControl', false)) {
-			let nav = new element('li').text('© Copyright').parent(this.elementNav);
-			block.data('nav', nav);
-		}
+		let block = new element('span').class('copyright').parent(this.elementControl);
 		this.addLine(block, song.license).class('copyright');
 
 		this.elementControl.firstElementChild.scrollIntoView();
+		this.updatePopup();
 	}
 
 	editSong(song, li) {
@@ -1671,6 +1920,7 @@ class GUI {
 	showConfig() {
 		let table = new element('table').class('config');
 
+		// ToDo there is a bug in here	script.js:1799:30	Uncaught TypeError: (new element(...)).text(...).parent is not a function
 		Config.forEach((v, k) => {
 			let tr = new element('tr').parent(table).on('contextmenu', e => {
 				let td = tr.querySelector('td');
@@ -1750,9 +2000,6 @@ class GUI {
 		}
 
 		this.switchActive(this.elementControl, p.parentElement, p);
-		if(p.parentElement['nav']) {
-			this.switchActive(this.elementNav, p.parentElement['nav']);
-		}
 	}
 }
 
@@ -2053,4 +2300,5 @@ window.onbeforeunload = e => {
 	delete e['returnValue'];
 
 	Storable.instances.forEach(i => i.save());
+	PopUp.close();
 }

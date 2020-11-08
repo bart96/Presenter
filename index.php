@@ -1,12 +1,18 @@
-<!DOCTYPE html>
+<?php
+
+    function file_prevent_caching($path) {
+        echo $path . '?' . base_convert(filemtime($path), 10, 35);
+    }
+
+?><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Presenter</title>
 
-    <script type="text/javascript" src="script.js"></script>
+    <script type="text/javascript" src="<?php file_prevent_caching('script.js'); ?>"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css" media="all">
+    <link rel="stylesheet" href="<?php file_prevent_caching('style.css'); ?>" media="all">
 </head>
 <body>
 <main></main>
@@ -22,7 +28,8 @@
 		/*
 		storage.addSubscriber(() => gui.changeHandler(... arguments));
 		gui.addSubscriber(() => storage.changeHandler(... arguments));
-*/
+        */
+
 		new DragNDrop(e, ['text/plain'], 'over', element.from('#songs')).onFileLoaded(text => {
 			CCLISong.parse(text).exists(s => {
 				let message = 'The song "' + s.title + '" with number "' + s.songNumber

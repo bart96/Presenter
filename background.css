@@ -1,0 +1,19 @@
+#content {
+	position: absolute;
+	right: 0;
+	left: 0;
+}
+
+/* text-shadow: 0 0 5px #000; */
+
+#background {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+
+	/*background: transparent center center/auto 100% no-repeat;*/
+	background: transparent center center/100% auto no-repeat;
+}
+
