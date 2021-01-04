@@ -1,4 +1,6 @@
 
+const CUSTOM_NUMBER_LIMIT = 10000;
+
 class element {
 	constructor(type) {
 		if(!type) {
@@ -124,6 +126,12 @@ class element {
 		if(this.element.firstElementChild) {
 			this.element.removeChild(this.element.firstElementChild);
 		}
+
+		return this;
+	}
+
+	removeChild(child) {
+		this.element.removeChild(child);
 
 		return this;
 	}
@@ -278,11 +286,18 @@ class element {
 		return this;
 	}
 
-	appendChild(child) {
+	appendChild(child, index) {
 		if(child.element) {
+			if(index !== undefined) {
+				return this.element.insertBefore(child.element, this.element.children[index]);
+			}
+
 			return this.element.appendChild(child.element);
 		}
 
+		if(index !== undefined) {
+			return this.element.insertBefore(child, this.element.children[index]);
+		}
 		return this.element.appendChild(child);
 	}
 
@@ -506,7 +521,7 @@ class Loadable {
 	}
 }
 
-let AJAX = new (function() {
+const AJAX = new (function() {
 	let init = (method, url, callback) => {
 		let xhttp;
 
@@ -840,8 +855,8 @@ class Storage extends Storable {
 					$.addSong({id: id});
 				});
 
-				// ToDO save
-				this.save();
+				// ToDo save
+				$.save();
 			}
 
 			function downloadJob() {
@@ -872,7 +887,7 @@ class Storage extends Storable {
 	}
 }
 
-let Modal = new class {
+const Modal = new class {
 	constructor() {
 		this.isActive = false;
 		this.modal = new element('div').class('modal');
@@ -889,11 +904,13 @@ let Modal = new class {
 		});
 
 		this.apply = new element('button').type('submit').text('OK').on('click', e => {
-			this.close();
-
 			if(this.callback) {
-				this.callback();
+				if(this.callback() === false) {
+					return;
+				}
 			}
+
+			this.close();
 		})
 
 		document.addEventListener("DOMContentLoaded", () => {
@@ -966,7 +983,7 @@ let Modal = new class {
 	}
 }
 
-let Account = new class {
+const Account = new class {
 	constructor() {
 		this.isLoggedIn = false;
 		this.subscribers = [];
@@ -1033,7 +1050,7 @@ let Account = new class {
 	}
 }
 
-let Notification = new class extends Loadable {
+const Notification = new class extends Loadable {
 	constructor() {
 		super();
 		this.container = new element('ul').id('alerts');
@@ -1055,7 +1072,7 @@ let Notification = new class extends Loadable {
 
 		setTimeout(() => {
 			alert.remove();
-		}, Config.get('notificationDisappearTime', '3000'));
+		}, Config.get('notificationDisappearTime', 3000));
 	}
 
 	success(message) {
@@ -1097,7 +1114,7 @@ let Notification = new class extends Loadable {
 	}
 }
 
-let Config = new class extends Storable {
+const Config = new class extends Storable {
 	constructor() {
 		super('config', {});
 	}
@@ -1139,7 +1156,7 @@ let Config = new class extends Storable {
 	}
 }
 
-let PopUp = new class {
+const PopUp = new class {
 	constructor() {
 		this.loaded = [];
 		this.visibility = [];
@@ -1270,6 +1287,20 @@ class GUI extends Loadable {
 				this.search.focus().select();
 			}
 		}).tooltip('Toggle search');
+		new element('li').class('add').parent(this.elementNav).on('click', e => {
+			let name = Config.get('defaultVerseName', 'Vers 1');
+			let blocks = {};
+			blocks[name] = '';
+
+			this.editSong(new CCLISong({
+				title: '',
+				blocks: blocks,
+				initialOrder: [name],
+				order: [name]
+			}));
+		}).tooltip('Create new song');
+
+		new element('li').class('fill').parent(this.elementNav);
 		let search = new element('div').id('search').parent(this.elementNav);
 
 		this.save = new element('li').class('shows').on('click', e => {
@@ -1302,7 +1333,7 @@ class GUI extends Loadable {
 			});
 
 			function loadShows($) {
-				AJAX.get('rest.php?shows').success(r => {
+				AJAX.get('rest.php?shows&limit=' + Config.get('showLimit', 30)).success(r => {
 					wrapper.clear();
 
 					JSON.parse(r).forEach(show => {
@@ -1312,8 +1343,10 @@ class GUI extends Loadable {
 						});
 
 						new element('button').type('button').class('upload').tooltip('upload').parent(li).on('click', e => {
-							$.notifySubscriber('uploadShow', show);
-							loadShows($);
+							if(!Config.get('confirmShowOverwrite', true) || confirm('Overwrite show?')) {
+								$.notifySubscriber('uploadShow', show);
+								loadShows($);
+							}
 						});
 
 						new element('button').type('button').text('×').tooltip('delete').parent(li).on('click', e => {
@@ -1324,13 +1357,13 @@ class GUI extends Loadable {
 						});
 					});
 				}).error(r => {
-					this.save.remove();
 					Notification.rest(r);
+					this.save.remove();
 				});
 			}
 
 			loadShows(this);
-			Modal.show('Shows', wrapper).width('350px').resizable('235px').foot(newShow);
+			Modal.show('Shows', wrapper).width('375px').resizable('235px').foot(newShow);
 		}).tooltip('Shows');
 
 		this.account = new element('li').class('account').parent(this.elementNav).on('click', e => {
@@ -1407,6 +1440,41 @@ class GUI extends Loadable {
 				});
 			}
 		};
+		new element('button').type('button').class('all').parent(search).on('click', e => {
+			AJAX.get('rest.php?search&all&order=' + Config.get('songOverviewOrder', 'lexicographic|numeric')).success(r => {
+				let wrapper = new element('ul').class('songs');
+
+				JSON.parse(r).forEach(song => {
+					let name = '(' + song.songNumber + ') ' + song.title;
+
+					// ToDo double click????
+					let li = new element('li').parent(wrapper);
+					new element('span').text(name).parent(li).on('dblclick', e => {
+						CCLISong.download(song.songNumber).success(r => {
+							this.notifySubscriber('downloadSong', r);
+							Notification.success('Successfully added "' + song.title + '"');
+						});
+					});
+
+					if(Config.get('showRemoveSongFromDatabase', false)) {
+						new element('button').class('close').parent(li).on('click', e => {
+							if(confirm('Do you really want to remove the song "' + song.title + '" from the database?')) {
+								AJAX.get('rest.php?song=' + song.songNumber + '&delete').success(r => {
+									li.remove();
+									Notification.rest(r);
+								}).error(r => {
+									Notification.rest(r);
+								});
+							}
+						})
+					}
+				});
+
+				Modal.show('All songs', wrapper).width('800px').resizable('310px');
+			}).error(r => {
+				Notification.rest(r);
+			})
+		});
 
 		this.search.on('drop', e => {
 			let text = e.dataTransfer.getData('text/plain');
@@ -1581,7 +1649,7 @@ class GUI extends Loadable {
 			.attribute('data-number', song.id)
 			.parent(this.elementSongs);
 
-		new element('span')
+		let span = new element('span')
 			.text(song.title)
 			.on(Config.get('songClickBehaviour', 'dblclick'), e => {
 				e.stopPropagation();
@@ -1614,7 +1682,7 @@ class GUI extends Loadable {
 				e.preventDefault();
 				e.stopPropagation();
 
-				if(Config.get('confirmDelete', false) && !confirm('Do you really want to remove the song?')) {
+				if(Config.get('confirmSongDelete', true) && !confirm('Do you really want to remove the song?')) {
 					return;
 				}
 
@@ -1625,6 +1693,14 @@ class GUI extends Loadable {
 			.ignore('contextmenu');
 
 		this.notifySubscriber('addSong', song);
+
+		song.addSubscriber((type, data) => {
+			switch(type) {
+				case 'songTitle':
+					span.text(data.title);
+					break;
+			}
+		});
 
 		return song;
 	}
@@ -1644,7 +1720,7 @@ class GUI extends Loadable {
 		PopUp.updatePopup(this.current.id, active.innerHTML, active.className, black);
 	}
 
-	addLine(block, line) {
+	addLine(block, line, className) {
 		if(!line) {
 			line = '<br />';
 		}
@@ -1676,6 +1752,11 @@ class GUI extends Loadable {
 			controlLine.class('overflow');
 		}
 
+		if(className) {
+			controlLine.class(className);
+			previewLine.class(className);
+		}
+
 		return previewLine;
 	}
 
@@ -1692,6 +1773,7 @@ class GUI extends Loadable {
 			this.elementPreview.classList.remove('black');
 		}
 
+		let block = null;
 		song.order.forEach(order => {
 			let createBlock = () => {
 				let block = new element('span').parent(this.elementControl).on('contextmenu', e => {
@@ -1726,7 +1808,7 @@ class GUI extends Loadable {
 				return block;
 			}
 
-			let block = createBlock();
+			block = createBlock();
 
 			song.blocks[order].forEach(line => {
 				if(line === '---') {
@@ -1738,8 +1820,14 @@ class GUI extends Loadable {
 			});
 		});
 
-		let block = new element('span').class('copyright').parent(this.elementControl);
-		this.addLine(block, song.license).class('copyright');
+		if(song.hasLicense) {
+			block = new element('span').class('copyright').parent(this.elementControl);
+			new element('h1').html('©<em>Copyright</em>').parent(block);
+			this.addLine(block, song.license).class('copyright');
+		}
+		else {
+			this.addLine(block, '', 'fill');
+		}
 
 		this.elementControl.firstElementChild.scrollIntoView();
 		this.updatePopup();
@@ -1747,33 +1835,16 @@ class GUI extends Loadable {
 
 	editSong(song, li) {
 		let $ = this;
-		let wrapper = new element('div');
+		let wrapper = new element('div').class('song');
 		let blocks = {};
 		let currentBlock = null;
-		let orderCursorPosition = 0;
+		let title = new element('input');
 		let editBlock = new element('textarea');
-		let editOrder = new element('input');
-		let toggleDelete = new element('li');
-		let createNew = new element('li');
+		let editOrder = new element('ul');
+		let options = new element('li');
 
 		function editBlockHandler() {
 			blocks[currentBlock] = editBlock.value();
-		}
-
-		function editOrderHandler() {
-			let length = editOrder.value().length;
-			orderCursorPosition = editOrder.element.selectionStart;
-			editOrder.value(editOrder.value().replace(/ *\| */g, ' | ').trim());
-
-			orderCursorPosition += editOrder.value().length - length;
-			if(editOrder.element.selectionStart === editOrder.element.selectionEnd) {
-				if(editOrder.element.selectionStart !== orderCursorPosition) {
-					editOrder.element.selectionEnd = editOrder.element.selectionStart = orderCursorPosition;
-				}
-			}
-			else {
-				orderCursorPosition = editOrder.element.selectionStart;
-			}
 		}
 
 		function createBlock(type, block, active) {
@@ -1788,51 +1859,31 @@ class GUI extends Loadable {
 
 			blocks[type] = block;
 
-			let li = new element('li').text(type).before(createNew).on('click', e => {
+			let li = new element('li').before(options).on('click', e => {
 				currentBlock = type;
 				editBlock.value(blocks[type]);
 
 				$.switchActive(ul, li);
-			}).on('dblclick', e => {
-				e.preventDefault();
-				e.stopPropagation();
-
-				let currentText = editOrder.value();
-				let insertText = li.element.textContent;
-				let nextPart = currentText.indexOf(' | ', orderCursorPosition);
-
-				if(nextPart < 0) {
-					if(currentText.length > 0) {
-						insertText = ' | ' + insertText;
-					}
-
-					editOrder.value(currentText + insertText);
-				}
-				else {
-					insertText = ' | ' + insertText;
-
-					editOrder.value(currentText.substr(0, nextPart) + insertText + currentText.substr(nextPart));
-				}
-
-				// ToDo: remove unnecessary double blocks
-
-				orderCursorPosition += insertText.length;
 			});
+			new element('span').text(type).parent(li);
 
-			new element('button').type('button').parent(li).on('click', e => {
-				if(ul.children.length < 4) {
+			new element('button').type('button').class('close').parent(li).on('click', e => {
+				if(ul.children.length < 3) {
 					Notification.error('You can\'t remove all blocks');
 					return;
 				}
 
 				let active = li.previousElementSibling;
-				$.switchActive(ul, toggleDelete.is(active) ? active.nextElementSibling : active);
+				$.switchActive(ul, active);
 
 				li.remove();
 
-				editOrder.value(editOrder.value().split('|').filter(e => {
-					return e.trim() !== type
-				}).join('|'));
+				Array.from(editOrder.children).forEach(e => {
+					if(e.textContent === type) {
+						editOrder.removeChild(e.nextElementSibling);
+						editOrder.removeChild(e);
+					}
+				});
 
 				delete blocks[type];
 			});
@@ -1845,16 +1896,9 @@ class GUI extends Loadable {
 			}
 		}
 
-		editBlock.parent(wrapper).on('blur', editBlockHandler);
-		editOrder.class('edit').value(song.order.join(' | '))
-			.on('click', editOrderHandler).on('blur', editOrderHandler)
-			.on('keyup', editOrderHandler);
-
 		let ul = new element('ul').class('options').parent(wrapper);
-		toggleDelete.text('-').parent(ul).on('click', e => {
-			ul.classList.toggle('remove');
-		});
-		createNew.text('+').parent(ul).on('click', e => {
+		options.parent(ul);
+		new element('button').type('button').class('add').parent(options).on('click', e => {
 			let name = prompt('Name', Config.get('newVerseValue', 'Outro'));
 
 			if(!name) {
@@ -1868,6 +1912,43 @@ class GUI extends Loadable {
 
 			createBlock(name, [], true);
 		});
+		new element('button').type('button').class('delete').parent(options).on('click', e => {
+			wrapper.classList.toggle('remove');
+		})
+
+		title.type('text').class('title').value(song.title).placeholder('Title').parent(wrapper);
+
+		editBlock.parent(wrapper).on('blur', editBlockHandler);
+		editOrder.class('order');
+
+		function add(index) {
+			let li = new element('li').on('click', e => {
+				console.log(currentBlock);
+				add(li.index);
+				order(currentBlock, li.index);
+			});
+			new element('span').class('add').parent(li);
+
+			editOrder.appendChild(li, index);
+		}
+
+		function order(text, index) {
+			let li = new element('li');
+			new element('span').text(text).parent(li);
+			new element('button').class('close').parent(li).on('click', e => {
+				li.parentElement.removeChild(li.previousElementSibling);
+				li.remove();
+			});
+
+			editOrder.appendChild(li, index)
+		}
+
+		add();
+
+		song.order.forEach(e => {
+			order(e);
+			add();
+		})
 
 
 		song.initialOrder.forEach((order, i) => {
@@ -1875,13 +1956,25 @@ class GUI extends Loadable {
 		});
 
 		editOrder.parent(wrapper);
-		orderCursorPosition = editOrder.value().length;
 
-		Modal.show('Order', wrapper).width('1200px').onApply(r => {
+		Modal.show('Song editor', wrapper).width('1200px').onApply(r => {
+			if(!title.value()) {
+				Notification.error('Title is missing');
+				return false;
+			}
+
+			song.setTitle(title.value());
+
 			let newOrder = [];
 
-			let value = editOrder.value().split('|');
+			let value = [];
 			let types = Object.keys(blocks);
+
+			Array.from(editOrder.children).forEach(e => {
+				if(e.textContent) {
+					value.push(e.textContent);
+				}
+			});
 
 			for(let i in blocks) {
 				song.setBlock(i, blocks[i].replace(/(\n\s*)|(\s*\n)|(\n\s*\n)/g, '\n').split('\n'));
@@ -1907,8 +2000,13 @@ class GUI extends Loadable {
 
 			song.saveOrder(newOrder);
 
-			if(Config.get('reloadSongAfterEdit', false)) {
-				this.showSong(song, li);
+			if(li) {
+				if(Config.get('reloadSongAfterEdit', false)) {
+					this.showSong(song, li);
+				}
+			}
+			else {
+				this.addSong(song);
 			}
 
 			if(Account.isLoggedIn) {
@@ -1949,7 +2047,9 @@ class GUI extends Loadable {
 
 					switch(td.getAttribute('type')) {
 						case 'number':
-							value = Number.bind(null, value);
+							// ToDo fix this, value will be a Number() and not expected in the config data
+							// value = Number.bind(null, value);
+							value = parseFloat(value);
 							break;
 						case 'boolean':
 							value = value === 'true';
@@ -1999,7 +2099,9 @@ class GUI extends Loadable {
 			p.parentElement.nextElementSibling.scrollIntoView(scrollOptions);
 		}
 
-		this.switchActive(this.elementControl, p.parentElement, p);
+		if(!p.classList.contains('fill')) {
+			this.switchActive(this.elementControl, p.parentElement, p);
+		}
 	}
 }
 
@@ -2040,20 +2142,7 @@ class Song {
 	get id() {
 		return this.songNumber;
 	}
-/*
-	set title(title) {
-		let old = this.title;
-		this.title = title;
 
-		this.changeListener.forEach(fn => {
-			fn('songTitle', this, old);
-		});
-	}
-
-	get title() {
-		return this.title;
-	}
-*/
 	get text() {
 		let text = [];
 
@@ -2074,6 +2163,10 @@ class Song {
 		return blocks;
 	}
 
+	get hasLicense() {
+		return false;
+	}
+
 	get license() {
 		return '';
 	}
@@ -2085,6 +2178,15 @@ class Song {
 
 	hasBlock(type) {
 		return Object.keys(type).includes(type);
+	}
+
+	setTitle(title) {
+		let old = this.title;
+		this.title = title;
+
+		this.changeListener.forEach(fn => {
+			fn('songTitle', this, old);
+		});
 	}
 
 	setBlock(type, block) {
@@ -2221,6 +2323,10 @@ class CCLISong extends Song {
 		super(obj);
 
 		this.account = parseInt(obj.account);
+	}
+
+	get hasLicense() {
+		return this.songNumber >= CUSTOM_NUMBER_LIMIT;
 	}
 
 	get license() {

@@ -4,34 +4,47 @@
 
 	try {
 		if(isset($_GET['search'])) {
-			if(!isset($_POST['subject'])) {
+			if(!(isset($_POST['subject']) || isset($_GET['all']))) {
 				RestResult::s500('"subject" is missing');
 			}
 
 			require_once('Account.php');
 
 			$searchResult = [];
-			$subject = $_POST['subject'];
-			if(ctype_digit($subject)) {
-				$searchResult = Account::searchSongNumber(intval($subject));
-			} else {
-				if(isset($_GET['text'])) {
-					$searchResult = Account::searchText($subject);
+
+			if(isset($_GET['all'])) {
+				$order = null;
+
+				if(isset($_GET['order'])) {
+					$order = $_GET['order'];
+				}
+
+				$searchResult = Account::searchAll($order);
+			}
+			else {
+				$subject = $_POST['subject'];
+				if(ctype_digit($subject)) {
+					$searchResult = Account::searchSongNumber(intval($subject));
 				} else {
-					$searchResult = Account::searchTitle($subject);
+					if(isset($_GET['text'])) {
+						$searchResult = Account::searchText($subject);
+					} else {
+						$searchResult = Account::searchTitle($subject);
+					}
 				}
 			}
 
-			echo json_encode(Account::getSongs($searchResult));
+			echo json_encode($searchResult);
 			die;
 		}
 
 		if(isset($_GET['song'])) {
-			if(isset($_POST['song'])) {
-				require_once('Account.php');
-				Account::checkLogin();
+			require_once('Account.php');
+			require_once('Song.php');
 
-				require_once('Song.php');
+			Account::checkLogin();
+
+			if(isset($_POST['song'])) {
 				$song = Song::createFromJSON($_POST['song']);
 
 				if(Account::getAccount() !== $song->getAccount()) {
@@ -49,10 +62,18 @@
 				RestResult::s500('"song" is not a number');
 			}
 
-			require_once('Account.php');
-			require_once('Song.php');
+			if(isset($_GET['delete'])) {
+				if(Song::delete(Account::getAccount(), intval($_GET['song']))) {
+					RestResult::s200('Song successfully deleted');
+				}
+				else {
+					RestResult::s500('Unable to delete song');
+				}
+			}
+			else {
+				echo json_encode(Song::get(Account::getAccount(), intval($_GET['song'])));
+			}
 
-			echo json_encode(Song::get(Account::getAccount(), intval($_GET['song'])));
 			die;
 		}
 
@@ -93,7 +114,16 @@
 
 					Account::deleteShow($_GET['title']);
 				default:
-					echo json_encode(Account::getShows());
+					$limit = 30;
+					if(isset($_GET['limit'])) {
+						if(!ctype_digit($_GET['limit'])) {
+							RestResult::s500('"limit" is not a number');
+						}
+
+						$limit = intval($_GET['limit']);
+					}
+
+					echo json_encode(Account::getShows($limit));
 			}
 
 			die;

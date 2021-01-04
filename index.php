@@ -13,6 +13,8 @@
     <script type="text/javascript" src="<?php file_prevent_caching('script.js'); ?>"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php file_prevent_caching('style.css'); ?>" media="all">
+    <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" type="image/x-icon" href="favicon.ico">
 </head>
 <body>
 <main></main>

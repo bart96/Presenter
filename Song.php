@@ -61,6 +61,35 @@
 			return $song;
 		}
 
+		public static function delete(int $account, int $songNumber) : bool {
+			try {
+				$stmt = self::prepare('
+					DELETE FROM `blocks`
+					WHERE `account` = ?
+					AND `songnumber` = ?
+				');
+
+				$stmt->bind_param('ii', $account, $songNumber);
+				$stmt->execute();
+				$stmt->close();
+
+				$stmt = self::prepare('
+					DELETE FROM `songs`
+					WHERE `account` = ?
+					AND `songnumber` = ?
+				');
+
+				$stmt->bind_param('ii', $account, $songNumber);
+				$stmt->execute();
+				$stmt->close();
+			}
+			catch(mysqli_sql_exception $e) {
+				return false;
+			}
+
+			return true;
+		}
+
 		/**
 		 * @param string $json
 		 * @return Song
@@ -80,7 +109,7 @@
 				}
 			}
 
-			if(!isset($obj['songNumber'])) {
+			if(!isset($obj['songNumber']) || $obj['songNumber'] < 1) {
 				$obj['songNumber'] = Account::getNextSongIndex();
 			}
 
@@ -94,6 +123,15 @@
 			);
 		}
 
+		/**
+		 * @param int $account
+		 * @param string $title
+		 * @param string $initialOrder
+		 * @param string $order
+		 * @param array $blocks
+		 * @return Song
+		 * @throws LoginException
+		 */
 		public static function createWithoutSongNumber(int $account, string $title, string $initialOrder, string $order, array $blocks) : Song {
 			return self::create($account, Account::getNextSongIndex(), $title, $initialOrder, $order, $blocks);
 		}

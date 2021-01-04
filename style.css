@@ -5,6 +5,7 @@
 	user-select: none;
 	list-style-type: none;
 	font-family: 'Roboto', sans-serif;
+	font-size: 16px;
 	box-sizing: border-box;
 }
 
@@ -115,11 +116,15 @@ main #songs label {
 	cursor: pointer;
 }
 
-main #songs li {
+main #songs li,
+.modal .songs li,
+.modal .song li {
 	display: flex;
 }
 
-main #songs li span {
+main #songs li span,
+.modal .songs li span,
+.modal .song li span {
 	position: relative;
 	display: block;
 	flex-grow: 1;
@@ -133,7 +138,6 @@ main #songs li span {
 .shrunk main #songs li span {
 	padding-left: 50px;
 	overflow: visible;
-
 }
 
 .shrunk main #songs li span,
@@ -156,7 +160,9 @@ main #songs li span {
 	visibility: visible;
 }
 
-main #songs li button {
+main #songs li button,
+.modal .songs li button.close,
+.modal .song li button.close {
 	padding: 0 15px;
 	font-size: 16px;
 	background: transparent;
@@ -193,6 +199,12 @@ main #control span h1 {
 	writing-mode: sideways-lr;
 	text-align: center;
 	cursor: pointer;
+}
+
+main #control span h1 em {
+	display: none;
+	margin-left: 5px;
+	font-style: normal;
 }
 
 #content h1 {
@@ -246,12 +258,12 @@ main[theme="expert"] #control span h1 {
 	writing-mode: unset;
 }
 
-main[theme="expert"] #control span p {
-	margin: 0;
+main[theme="expert"] #control span h1 em {
+	display: inline;
 }
 
-main[theme="expert"] #control span.copyright p {
-	margin-top: 35px;
+main[theme="expert"] #control span p {
+	margin: 0;
 }
 
 main #nav {
@@ -261,14 +273,15 @@ main #nav {
 	z-index: 99;
 }
 
-main #nav > li,
+main #nav > li:not(.fill),
 main #control li {
 	display: inline-block;
 	padding: 10px 15px;
 	cursor: pointer;
 }
 
-main #nav > li {
+main #nav > li,
+main #nav.search #search button.all {
 	width: 39px;
 	height: 39px;
 	background: transparent center center/20px 20px no-repeat;
@@ -279,7 +292,6 @@ main #nav > li {
 }
 
 main #nav li.sidebar {
-	z-index: 99;
 	background-image: url('data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9JzMwMHB4JyB3aWR0aD0nMzAwcHgnICBmaWxsPSIjRkZGRkZGIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeD0iMHB4IiB5PSIwcHgiPjx0aXRsZT5sZWZ0IHNpZGViYXI8L3RpdGxlPjxnIGRhdGEtbmFtZT0ibGVmdCBzaWRlYmFyIj48cGF0aCBkPSJNNywyM0gyYTEsMSwwLDAsMS0xLTFWMkExLDEsMCwwLDEsMiwxSDdaTTIyLDFIOVYyM0gyMmExLDEsMCwwLDAsMS0xVjJBMSwxLDAsMCwwLDIyLDFaIj48L3BhdGg+PC9nPjwvc3ZnPg==');
 }
 
@@ -288,12 +300,16 @@ main #nav li.search {
 	background-image: url('data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9JzMwMHB4JyB3aWR0aD0nMzAwcHgnICBmaWxsPSIjRkZGRkZGIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTEyIDUxMiIgZW5hYmxlLWJhY2tncm91bmQ9Im5ldyAwIDAgNTEyIDUxMiIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PHBhdGggZD0iTTUxMS45ODcsNDU0LjA4NkwzNzUuNjUsMzE3Ljc0OGMyMS40NTItMzIuNDA0LDMzLjkzNi03MS4xODYsMzMuOTM2LTExMi45MzQgIGMwLTExMy4xMjEtOTEuNjgzLTIwNC44MDUtMjA0Ljc4Ni0yMDQuODA1QzkxLjY5NSwwLjAwOSwwLjAxMyw5MS42OTMsMC4wMTMsMjA0LjgxNGMwLDExMy4wOSw5MS42ODMsMjA0LjgwNSwyMDQuNzg3LDIwNC44MDUgIGM0MS43MzEsMCw4MC41NTktMTIuNTI5LDExMi45MzItMzMuOTY3TDQ1NC4wNjgsNTExLjk5TDUxMS45ODcsNDU0LjA4NnogTTU4LjA0MiwyMDQuODQ1YzAtODEuMDYsNjUuNzE1LTE0Ni43NDUsMTQ2Ljc1OC0xNDYuNzQ1ICBjODEuMDU5LDAsMTQ2Ljc3Myw2NS42ODUsMTQ2Ljc3MywxNDYuNzQ1YzAsODEuMDYxLTY1LjcxNSwxNDYuNzc2LTE0Ni43NzMsMTQ2Ljc3NkMxMjMuNzU3LDM1MS42MjEsNTguMDQyLDI4NS45MDYsNTguMDQyLDIwNC44NDV6ICAiPjwvcGF0aD48L3N2Zz4=');
 }
 
+main #nav li.add {
+	background-image: url('data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9JzMwMHB4JyB3aWR0aD0nMzAwcHgnICBmaWxsPSIjRkZGRkZGIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgZW5hYmxlLWJhY2tncm91bmQ9Im5ldyAwIDAgMTAwIDEwMCIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PHBhdGggZD0iTTgwLjE0OCw0MS40ODJINTguNTE4VjE5Ljg1MWMwLTQuNzA0LTMuODEzLTguNTE4LTguNTE4LTguNTE4cy04LjUxOCwzLjgxMy04LjUxOCw4LjUxOHYyMS42MzJIMTkuODUyICBjLTQuNzA0LDAtOC41MTgsMy44MTMtOC41MTgsOC41MThzMy44MTMsOC41MTgsOC41MTgsOC41MThoMjEuNjMxdjIxLjYzMmMwLDQuNzA0LDMuODEzLDguNTE4LDguNTE4LDguNTE4czguNTE4LTMuODEzLDguNTE4LTguNTE4ICBWNTguNTE4aDIxLjYzMWM0LjcwNCwwLDguNTE4LTMuODEzLDguNTE4LTguNTE4Uzg0Ljg1Myw0MS40ODIsODAuMTQ4LDQxLjQ4MnoiPjwvcGF0aD48L3N2Zz4=');
+}
+
 main #nav li.account {
 	background-image: url('data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9JzMwMHB4JyB3aWR0aD0nMzAwcHgnICBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIGRhdGEtbmFtZT0iTGF5ZXIgMiIgdmlld0JveD0iMCAwIDMyIDMyIiB4PSIwcHgiIHk9IjBweCI+PHRpdGxlPmFjY291bnQsIHBlb3BsZSwgYXZhdGFyLCBwZXJzb24tPC90aXRsZT48cGF0aCBkPSJNMTYsMkExNC4wMDE0NCwxNC4wMDE0NCwwLDAsMCw2LDI1LjhjLjMzLjMzLjY3LjY0LDEuMDMuOTRBMTAuNDI3NDUsMTAuNDI3NDUsMCwwLDAsOC4xNiwyNy41OWExMy45NTcxNSwxMy45NTcxNSwwLDAsMCwxNS42ODAwNiwwQTEwLjQyNzQ1LDEwLjQyNzQ1LDAsMCwwLDI0Ljk3LDI2Ljc0Yy4zNjAwNS0uMy43LS42MSwxLjAzLS45NEExNC4wMDE0NCwxNC4wMDE0NCwwLDAsMCwxNiwyWm05LjYsMjEuMmExMC4wMjExNiwxMC4wMjExNiwwLDAsMC02LjE1LTYuNTgsNSw1LDAsMSwwLTYuOSwwQTEwLjAyMTE2LDEwLjAyMTE2LDAsMCwwLDYuNCwyMy4yYTEyLDEyLDAsMSwxLDE5LjIsMFoiPjwvcGF0aD48L3N2Zz4=');
 }
 
-main #nav li.shows {
-	position: relative;
+main #nav li.shows,
+main #nav.search #search button.all {
 	background-image: url('data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9JzMwMHB4JyB3aWR0aD0nMzAwcHgnICBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNDAgNDAiIGVuYWJsZS1iYWNrZ3JvdW5kPSJuZXcgMCAwIDQwIDQwIiB4bWw6c3BhY2U9InByZXNlcnZlIj48cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTgsMTIuNWgzdi0zSDhWMTIuNXogTTgsMTguNWgzdi0zSDhWMTguNXogTTgsMjQuNWgzdi0zSDggIFYyNC41eiBNOCwzMC41aDN2LTNIOFYzMC41eiBNMTMsOS41djNoMTl2LTNIMTN6IE0xMywxOC41aDE5di0zSDEzVjE4LjV6IE0xMywyNC41aDE5di0zSDEzVjI0LjV6IE0xMywzMC41aDE5di0zSDEzVjMwLjV6Ij48L3BhdGg+PC9zdmc+');
 }
 
@@ -308,9 +324,14 @@ main #nav li.config {
 	background-image: url('data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9JzMwMHB4JyB3aWR0aD0nMzAwcHgnICBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4bWw6c3BhY2U9InByZXNlcnZlIiB2ZXJzaW9uPSIxLjEiIHN0eWxlPSJzaGFwZS1yZW5kZXJpbmc6Z2VvbWV0cmljUHJlY2lzaW9uO3RleHQtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjtpbWFnZS1yZW5kZXJpbmc6b3B0aW1pemVRdWFsaXR5OyIgdmlld0JveD0iMCAwIDMzMyAzMzMiIHg9IjBweCIgeT0iMHB4IiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCI+PGRlZnM+PHN0eWxlIHR5cGU9InRleHQvY3NzIj4KICAgCiAgICAuZmlsMCB7ZmlsbDojZmZmZmZmfQogICAKICA8L3N0eWxlPjwvZGVmcz48Zz48cGF0aCBjbGFzcz0iZmlsMCIgZD0iTTE5NCAyODVsLTQgNDAgLTQ3IDAgLTQgLTQwYy0xMywtMyAtMjYsLTggLTM3LC0xNWwtMzAgMjUgLTM0IC0zMyAyNSAtMzFjLTcsLTExIC0xMiwtMjQgLTE1LC0zN2wtNDAgLTQgMCAtNDcgNDAgLTRjMywtMTMgOCwtMjYgMTUsLTM3bC0yNSAtMzAgMzQgLTM0IDMwIDI1YzExLC03IDI0LC0xMiAzNywtMTVsNCAtNDAgNDcgMCA0IDQwYzEzLDMgMjYsOCAzNywxNWwzMSAtMjUgMzMgMzQgLTI1IDMwYzcsMTEgMTIsMjQgMTUsMzdsNDAgNCAwIDQ3IC00MCA0Yy0zLDEzIC04LDI2IC0xNSwzN2wyNSAzMSAtMzMgMzMgLTMxIC0yNWMtMTEsNyAtMjQsMTIgLTM3LDE1em0tMjcgLTE4NWMzNywwIDY3LDMwIDY3LDY3IDAsMzcgLTMwLDY3IC02Nyw2NyAtMzcsMCAtNjcsLTMwIC02NywtNjcgMCwtMzcgMzAsLTY3IDY3LC02N3oiPjwvcGF0aD48L2c+PC9zdmc+');
 }
 
-main #nav #search {;
-	margin-left: -78px;
+main #nav li.fill {
 	flex-grow: 1;
+}
+
+main #nav #search {;
+	position: absolute;
+	left: 40px;
+	right: 0;
 	z-index: 9;
 }
 
@@ -328,7 +349,7 @@ main #nav #search ul {
 	position: absolute;
 	top: 39px;
 	right: 0;
-	left: 0;
+	left: -40px;
 	cursor: pointer;
 	user-select: auto;
 	z-index: 9999;
@@ -348,20 +369,35 @@ main #nav #search input:focus + ul {
 
 main #nav.search #search input {
 	width: 100%;
-	padding: 0 15px 0 93px;
+	padding: 0 45px;
+}
+
+main #nav #search button.all {
+	position: absolute;
+	right: 0;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity .6s;
+}
+
+main #nav.search #search button.all {
+	opacity: 1;
 }
 
 main #preview,
 #content {
 	overflow: hidden;
 	text-align: center;
-	font-size: 3.5vw;
-	line-height: 5.5vw;
 	opacity: 1;
 	transition: opacity .4s;
 	/*scroll-behavior: smooth;*/
 }
 
+main #preview p,
+#content p {
+	font-size: 3.5vw;
+	line-height: 5.5vw;
+}
 
 main #preview.black,
 #content.black,
@@ -372,6 +408,15 @@ main #preview.black,
 main #preview p,
 #content p {
 	white-space: nowrap;
+}
+
+main #control p.fill,
+main #preview p.fill,
+#content p.fill {
+	height: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
 }
 
 main #preview p.copyright {
@@ -421,6 +466,7 @@ main #preview p.copyright {
 	padding: 8px 16px;
 	background: inherit;
 	color: inherit;
+	font-size: 12px;
 	cursor: pointer;
 }
 
@@ -447,9 +493,79 @@ main #preview p.copyright {
 	user-select: auto;
 }
 
-.modal textarea {
+.modal .song .close {
+	display: none;
+}
+
+.modal .song.remove .close {
 	display: block;
-	width: 100%;
+}
+
+.modal .song ul.order {
+	margin: 0 -5px;
+	padding-top: 10px;
+}
+
+.modal .song ul.order li {
+	display: inline-block;
+	margin: 0 5px 10px;
+	cursor: pointer;
+}
+
+.modal .songs li button.close,
+.modal .song li button.close {
+	color: inherit;
+	background: none;
+	font-size: 16px;
+	cursor: pointer;
+}
+
+.modal .song {
+	display: grid;
+	grid-template-columns: 250px auto;
+}
+
+.modal .song input.title {
+	padding: 8px 10px;
+}
+
+.modal .song ul.options {
+	grid-row: 1 / span 3;
+	margin-right: 15px;
+}
+
+.modal .song ul.options li {
+	margin-bottom: 2px;
+}
+
+.modal .song ul.options li:last-child,
+.modal .song ul.options li:hover:last-child{
+	gap: 5px;
+	background: transparent;
+}
+
+.modal .song ul.options li:last-child button {
+	flex-grow: 1;
+	padding: 5px;
+	text-align: center;
+	cursor: pointer;
+}
+
+.modal .songs li span,
+.modal .song ul.options li span {
+	padding: 5px 35px 5px 15px;
+}
+
+.modal .song ul.order li {
+	display: inline-flex;
+}
+
+.modal .song ul.order li span {
+	padding: 5px 10px;
+}
+
+.modal .song textarea {
+	display: flex;
 	height: 130px;
 	min-height: 90px;
 	max-height: 300px;
@@ -457,33 +573,6 @@ main #preview p.copyright {
 	padding: 8px 10px;
 	resize: vertical;
 	user-select: auto;
-}
-
-.modal ul.options {
-	margin: 0 -5px;
-	padding: 10px 0;
-}
-
-.modal ul.options li {
-	float: left;
-	margin: 0 5px 10px;
-	padding: 5px 10px;
-	cursor: pointer;
-}
-
-.modal ul.options li button {
-	color: inherit;
-	background: none;
-	font-size: 16px;
-	cursor: pointer;
-}
-
-.modal ul.options li button:after {
-	margin-left: 7px;
-}
-
-.modal ul.remove li button:after {
-	content: '×';
 }
 
 .modal .login input {
@@ -498,6 +587,10 @@ main #preview p.copyright {
 	padding: 7px 15px;
 	margin-bottom: 5px;
 	cursor: pointer;
+}
+
+.modal .songs li {
+	margin-bottom: 5px;
 }
 
 .modal .shows li button {
@@ -521,19 +614,6 @@ main #songs label,
 	width: 100%;
 }
 
-.modal .edit {
-	width: 100%;
-	margin-bottom: 10px;
-	border-bottom: 1px solid;
-	padding: 8px 10px;
-	user-select: auto;
-	font-size: 14px;
-}
-
-.modal .edit span {
-	margin: 0 5px;
-}
-
 .modal table.config {
 	width: 100%;
 	margin: 10px 0;
@@ -554,10 +634,18 @@ main #songs label,
 	content: '×';
 }
 
+.add::after {
+	content: '+';
+}
+
+.delete::after {
+	content: '-';
+}
+
 #content {
 	margin: 2vw 0 1vw;
 	padding: 30px 0;
-	ont-size: 4vw;
+	font-size: 4vw;
 	line-height: 6vw;
 }
 
@@ -571,10 +659,6 @@ html,
 body,
 main #preview {
 	background-color: #000;
-}
-
-.modal ul.options li button:hover {
-	color: #000;
 }
 
 main #preview {
@@ -597,25 +681,34 @@ main #control span.active {
 }
 
 .modal .shows li,
-.modal ul.options li.active,
-.modal ul.options li.active:hover,
+.modal .songs li,
+.modal .song ul.options li.active,
+.modal .song ul.options li.active:hover,
+.modal .song ul.options li:last-child button:hover,
+.modal .song ul.order li.add,
+.modal .song ul.order li:hover,
 .modal table.config tr:nth-child(2n + 1),
 #expand,
 main #songs li:hover,
-main #nav li:hover {
+main #nav li:not(.fill):hover,
+main #nav.search #search button.all:hover {
 	background-color: #353535;
 }
 
 .modal .shows li:hover,
+.modal .songs li button.close:hover,
+.modal .song li button.close:hover,
 main #songs li button:hover {
 	background-color: #555555;
 }
 
 .modal .shows li button:hover,
+.modal .songs li:hover,
+.modal .song ul.options li:last-child button,
 .modal .container footer button,
 .modal .container header button:hover,
-.modal .edit span,
-.modal ul.options li,
+.modal .song ul.options li,
+.modal .song ul.order li,
 .modal table.config tr:hover,
 main #nav #search ul li:hover,
 main #nav li.active,
@@ -641,7 +734,8 @@ main[theme="expert"] #control span {
 .modal .container footer button:hover,
 .modal .container header,
 .modal .container footer,
-.modal ul.options li:hover,
+.modal .song ul.options li:hover,
+.modal .song ul.order li:hover,
 main #nav.search li.search,
 main #nav #search input,
 main #nav #search ul,
@@ -664,6 +758,11 @@ main[theme="expert"] #control span.active {
 
 main #nav li.popup.hide {
 	border-bottom-color: #4ECDC4;
+}
+
+.modal .song ul.options li:last-child button.add:hover,
+.modal .song ul.order li .add:hover {
+	background-color: #C7F464;
 }
 
 main.over #songs {
@@ -694,6 +793,9 @@ main #nav li.popup.black {
 
 html,
 body,
+.modal .song ul.options li button:hover,
+.modal .song ul.options li:last-child button,
+.modal .song ul.order li button,
 main #nav #search input,
 main #songs li button {
 	color: #FFF;

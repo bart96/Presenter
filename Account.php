@@ -5,6 +5,7 @@
 
 	class Account extends DB {
 		const SEARCH_RESULT_LIMIT = 10;
+		const CUSTOM_NUMBER_LIMIT = 10000;
 
 		private static int $account = -1;
 		private static string $mail;
@@ -66,21 +67,13 @@
 			self::checkLogin();
 
 			$stmt = self::prepare('
-				UPDATE `account`
-				SET `song_index` = `song_index` + 1
-				WHERE `license` = ?
+				SELECT MAX(`songnumber`) + 1
+				FROM `songs`
+				WHERE `songnumber` < ' . self::CUSTOM_NUMBER_LIMIT . '
+				AND `account` = ?
 			');
 
 			$stmt->bind_param('i', $_SESSION['account']);
-			$stmt->execute();
-			$stmt->close();
-
-			$stmt = self::prepare('
-				SELECT `song_index`
-				FROM `account`
-				WHERE `license` = ?
-			');
-			$stmt->bind_param('i', self::$account);
 			$stmt->execute();
 			$stmt->bind_result($songIndex);
 
@@ -89,6 +82,8 @@
 			if($stmt->fetch()) {
 				$index = $songIndex;
 			}
+
+			$stmt->close();
 
 			return $index;
 		}
@@ -108,6 +103,46 @@
 			}
 
 			return join(' ', $result);
+		}
+
+		/**
+		 * @param string $order lexicographic | numeric
+		 * @return array
+		 * @throws LoginException
+		 */
+		public static function searchAll(string $order = 'lexicographic') : array {
+			self::checkLogin();
+
+			switch($order) {
+				case 'numeric':
+					$order = 'songnumber';
+					break;
+				default:
+					$order = 'title';
+			}
+
+			$stmt = self::prepare('
+				SELECT `songnumber`, `title`
+				FROM `songs`
+				WHERE `account` = ?
+				ORDER BY `' . $order . '` ASC
+			');
+
+			$stmt->bind_param('i', self::$account);
+			$stmt->execute();
+			$stmt->bind_result($songNumber, $title);
+
+			$result = [];
+			while($stmt->fetch()) {
+				array_push($result, [
+					'songNumber' => $songNumber,
+					'title' => $title
+				]);
+			}
+
+			$stmt->close();
+
+			return $result;
 		}
 
 		/**
@@ -136,9 +171,9 @@
 			$stmt->execute();
 			$stmt->bind_result($songNumber, $title, $score);
 
-			$songNumbers = [];
+			$result = [];
 			while($stmt->fetch()) {
-				array_push($songNumbers, [
+				array_push($result, [
 					'songNumber' => $songNumber,
 					'title' => $title
 				]);
@@ -146,7 +181,7 @@
 
 			$stmt->close();
 
-			return $songNumbers;
+			return $result;
 		}
 
 		/**
@@ -172,9 +207,9 @@
 			$stmt->execute();
 			$stmt->bind_result($songNumber, $title);
 
-			$songNumbers = [];
+			$result = [];
 			while($stmt->fetch()) {
-				array_push($songNumbers, [
+				array_push($result, [
 					'songNumber' => $songNumber,
 					'title' => $title
 				]);
@@ -182,7 +217,7 @@
 
 			$stmt->close();
 
-			return $songNumbers;
+			return $result;
 		}
 
 		/**
@@ -216,9 +251,9 @@
 			$stmt->execute();
 			$stmt->bind_result($songNumber, $title, $score);
 
-			$songNumbers = [];
+			$result = [];
 			while($stmt->fetch()) {
-				array_push($songNumbers, [
+				array_push($result, [
 					'songNumber' => $songNumber,
 					'title' => $title
 				]);
@@ -226,11 +261,7 @@
 
 			$stmt->close();
 
-			return $songNumbers;
-		}
-
-		public static function getSongs($songNumbers) {
-			return $songNumbers;
+			return $result;
 		}
 
 		/**
@@ -255,10 +286,11 @@
 		}
 
 		/**
+		 * @param int $limit
 		 * @return array
 		 * @throws LoginException
 		 */
-		public static function getShows() {
+		public static function getShows(int $limit = 30) : array {
 			self::checkLogin();
 
 			$stmt = self::prepare('
@@ -266,9 +298,10 @@
 				FROM `shows`
 				WHERE `account` = ?
 				ORDER BY `date` DESC
+				LIMIT ?
 			');
 
-			$stmt->bind_param('i', self::$account);
+			$stmt->bind_param('ii', self::$account, $limit);
 			$stmt->execute();
 			$stmt->bind_result($title);
 
