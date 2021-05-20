@@ -210,6 +210,10 @@
 			$this->blocks[$type] = $text;
 		}
 
+		public function getSongNumber() {
+			return $this->songNumber;
+		}
+
 		public function getAccount() {
 			return $this->account;
 		}

@@ -52,7 +52,10 @@
 				}
 
 				if($song->update()) {
-					RestResult::s200('Song successfully uploaded');
+					(new RestResult())
+						->addSuccess('Song successfully uploaded')
+						->setData(['songNumber' => $song->getSongNumber()])
+						->send(200);
 				}
 
 				RestResult::s500('Couldn\'t upload song');
@@ -113,6 +116,20 @@
 					}
 
 					Account::deleteShow($_GET['title']);
+					RestResult::s200('"' . $_GET['title'] . '" successfully deleted');
+					break;
+				case 'CCLI':
+					$limit = 30;
+					if(isset($_GET['limit'])) {
+						if(!ctype_digit($_GET['limit'])) {
+							RestResult::s500('"limit" is not a number');
+						}
+
+						$limit = intval($_GET['limit']);
+					}
+
+					echo json_encode(ACCOUNT::getCCLINumbers($limit));
+					break;
 				default:
 					$limit = 30;
 					if(isset($_GET['limit'])) {

@@ -4,6 +4,7 @@
 		private array $success;
 		private array $warnings;
 		private array $errors;
+		private $data;
 
 		public static function s500(string ... $messages) {
 			(new RestResult())->addErrors(... $messages)->send(500);
@@ -21,6 +22,7 @@
 			$this->success = [];
 			$this->warnings = [];
 			$this->errors = [];
+			$this->data = null;
 		}
 
 		public function addSuccess(string ... $messages) : RestResult {
@@ -35,6 +37,11 @@
 
 		public function addErrors(string ... $messages) : RestResult {
 			$this->errors = array_merge($this->errors, $messages);
+			return $this;
+		}
+
+		public function setData($data) : RestResult {
+			$this->data = $data;
 			return $this;
 		}
 
@@ -56,6 +63,10 @@
 
 			if(count($this->errors) > 0) {
 				$result['errors'] = $this->errors;
+			}
+
+			if($this->data != null) {
+				$result['data'] = $this->data;
 			}
 
 			return $result;

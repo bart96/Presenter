@@ -1,5 +1,6 @@
 
 const CUSTOM_NUMBER_LIMIT = 10000;
+const SONG_SEPARATOR = '---';
 
 class element {
 	constructor(type) {
@@ -102,6 +103,17 @@ class element {
 	parent(parent) {
 		if(parent && parent.appendChild) {
 			parent.appendChild(this.element);
+		}
+
+		return this;
+	}
+
+	child(child) {
+		if(child instanceof element) {
+			this.element.appendChild(child.element);
+		}
+		else {
+			this.element.appendChild(child);
 		}
 
 		return this;
@@ -327,6 +339,22 @@ class element {
 
 	select() {
 		this.element.select();
+		return this;
+	}
+
+	copy() {
+		switch(this.element.tagName.toUpperCase()) {
+			case 'TEXTAREA':
+			case 'INPUT':
+				this.element.select();
+				this.element.setSelectionRange(0, 99999);
+
+				document.execCommand('copy');
+				break;
+			default:
+				console.warn('element type needs to be "textarea" or "input"');
+		}
+
 		return this;
 	}
 
@@ -923,7 +951,7 @@ const Modal = new class {
 		this.title.text(title);
 		this.callback = null;
 		this.content.removeClass('resizable').height('auto').clear();
-		this.footer.style('display', hideFooter ? 'none' : 'block');
+		this.footer.style('display', hideFooter ? 'none' : 'flex');
 
 		this.footer.clear();
 		this.apply.parent(this.footer);
@@ -1211,7 +1239,7 @@ const PopUp = new class {
 		return this;
 	}
 
-	updatePopup(id, html, classes, black) {
+	updatePopup(id, html, classes, black, copyright) {
 		if(this.inactive) {
 			return;
 		}
@@ -1226,6 +1254,7 @@ const PopUp = new class {
 
 		content.className = classes + (black ? ' black' : '');
 		content.innerHTML = html;
+		content.style = copyright ? 'opacity: 0' : '';
 
 		return this;
 	}
@@ -1304,7 +1333,18 @@ class GUI extends Loadable {
 		let search = new element('div').id('search').parent(this.elementNav);
 
 		this.save = new element('li').class('shows').on('click', e => {
+			let copy = new element('textarea').class('hidden');
 			let wrapper = new element('ul').class('shows');
+
+			AJAX.get('rest.php?shows=CCLI&limit=' + Config.get('showLimit', 30)).success(r => {
+				let result = [];
+
+				JSON.parse(r).forEach(show => {
+					result.push([show.title, ... show.songNumbers].join('\n'));
+				});
+
+				copy.value(result.join('\n\n'));
+			});
 
 			let newShow = new element('button').class('upload').text('New show').on('click', e => {
 				let d = new Date();
@@ -1331,6 +1371,11 @@ class GUI extends Loadable {
 				this.notifySubscriber('uploadShow', show);
 				loadShows(this);
 			});
+
+			let CCLIList = new element('button').text('Copy CCLI list').on('click', e => {
+				copy.copy();
+				Notification.success('Copied CCLI list to clipboard');
+			}).child(copy);
 
 			function loadShows($) {
 				AJAX.get('rest.php?shows&limit=' + Config.get('showLimit', 30)).success(r => {
@@ -1363,7 +1408,7 @@ class GUI extends Loadable {
 			}
 
 			loadShows(this);
-			Modal.show('Shows', wrapper).width('375px').resizable('235px').foot(newShow);
+			Modal.show('Shows', wrapper).width('375px').resizable('235px').foot(newShow, CCLIList);
 		}).tooltip('Shows');
 
 		this.account = new element('li').class('account').parent(this.elementNav).on('click', e => {
@@ -1447,7 +1492,6 @@ class GUI extends Loadable {
 				JSON.parse(r).forEach(song => {
 					let name = '(' + song.songNumber + ') ' + song.title;
 
-					// ToDo double click????
 					let li = new element('li').parent(wrapper);
 					new element('span').text(name).parent(li).on('dblclick', e => {
 						CCLISong.download(song.songNumber).success(r => {
@@ -1473,7 +1517,7 @@ class GUI extends Loadable {
 				Modal.show('All songs', wrapper).width('800px').resizable('310px');
 			}).error(r => {
 				Notification.rest(r);
-			})
+			});
 		});
 
 		this.search.on('drop', e => {
@@ -1717,7 +1761,10 @@ class GUI extends Loadable {
 		}
 
 		let black = this.elementPreview.classList.contains('black');
-		PopUp.updatePopup(this.current.id, active.innerHTML, active.className, black);
+		let copyright = active.classList.contains('copyright');
+		PopUp.updatePopup(this.current.id, active.innerHTML, active.className, black, copyright);
+
+		console.log(active);
 	}
 
 	addLine(block, line, className) {
@@ -1811,7 +1858,7 @@ class GUI extends Loadable {
 			block = createBlock();
 
 			song.blocks[order].forEach(line => {
-				if(line === '---') {
+				if(line === SONG_SEPARATOR) {
 					block = createBlock();
 				}
 				else {
@@ -2330,7 +2377,8 @@ class CCLISong extends Song {
 	}
 
 	get license() {
-		return 'CCLI-Liednummer ' + this.songNumber + '<br />CCLI-Lizenznummer ' +  this.account;
+		return Config.get('CCLISongnumber', 'CCLI-Liednummer') + ' ' + this.songNumber + '<br />'
+			+ Config.get('CCLILicensenumber', 'CCLI-Lizenznummer') + ' ' + this.account;
 	}
 
 	exists(existent, nonexistent) {
@@ -2354,6 +2402,14 @@ class CCLISong extends Song {
 
 	upload() {
 		let success = e => {
+			let r = JSON.parse(e);
+			if(!r.data || isNaN(r.data.songNumber)) {
+				console.error('could not update songnumber properly', e);
+			}
+			else {
+				this.songNumber = parseInt(r.data.songNumber);
+			}
+
 			if(Config.get('showSongUploadNotifications', true)) {
 				Notification.rest(e);
 			}

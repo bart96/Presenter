@@ -1,7 +1,7 @@
 <?php
 
 function file_prevent_caching($path) {
-	echo $path . '?' . base_convert(filemtime($path), 10, 35);
+	echo $path . '?v=' . base_convert(filemtime($path), 10, 35);
 }
 
 ?><!DOCTYPE html>

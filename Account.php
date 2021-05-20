@@ -60,6 +60,14 @@
 		}
 
 		/**
+		 * @param $songNumber
+		 * @return bool
+		 */
+		private static function filterCustomSongNumber($songNumber) : bool {
+			return $songNumber >= self::CUSTOM_NUMBER_LIMIT;
+		}
+
+		/**
 		 * @return int
 		 * @throws LoginException
 		 */
@@ -364,6 +372,48 @@
 			$stmt->bind_param('is', self::$account, $title);
 			$stmt->execute();
 			$stmt->close();
+		}
+
+		/**
+		 * @param int $limit
+		 * @return array
+		 * @throws LoginException
+		 */
+		public static function getCCLINumbers(int $limit) : array {
+			self::checkLogin();
+
+			$stmt = self::prepare('
+				SELECT `title`, `order`
+				FROM `shows`
+				WHERE `account` = ?
+				ORDER BY `date` DESC
+				LIMIT ?
+			');
+
+			$stmt->bind_param('ii', self::$account, $limit);
+			$stmt->execute();
+			$stmt->bind_result($title, $order);
+
+			$shows = [];
+
+			while($stmt->fetch()) {
+				$songNumbers = [];
+
+				foreach(explode(',', $order) as $songNumber) {
+					if(self::filterCustomSongNumber($songNumber)) {
+						array_push($songNumbers, $songNumber);
+					}
+				}
+
+				array_push($shows, [
+					'title' => $title,
+					'songNumbers' => $songNumbers
+				]);
+			}
+
+			$stmt->close();
+
+			return $shows;
 		}
 	}
 

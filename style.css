@@ -11,11 +11,6 @@
 
 html, body {
 	height: 100%;
-	transition: opacity .4s;
-}
-
-body.hide {
-	opacity: 0;
 }
 
 #alerts {
@@ -196,7 +191,9 @@ main #control span h1 {
 	left: 0;
 	padding: 0 10px;
 	font-size: 18px;
+	writing-mode: vertical-lr;
 	writing-mode: sideways-lr;
+	white-space: nowrap;
 	text-align: center;
 	cursor: pointer;
 }
@@ -255,7 +252,7 @@ main[theme="expert"] #control span h1 {
 	position: static;
 	margin-bottom: 10px;
 	padding: 8px 0;
-	writing-mode: unset;
+	writing-mode: horizontal-tb;
 }
 
 main[theme="expert"] #control span h1 em {
@@ -420,9 +417,9 @@ main #preview p.fill,
 }
 
 main #preview p.copyright {
-	font-size: 3vw;
-	line-height: 4vw;
-	padding: 2.5vw 0;
+	font-size: 2vw;
+	line-height: 3vw;
+	padding: 5vw 0 2vw;
 }
 
 
@@ -610,10 +607,6 @@ main #songs label,
 	background-image: url("data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9JzMwMHB4JyB3aWR0aD0nMzAwcHgnICBmaWxsPSIjZmZmZmZmIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgdmlld0JveD0iMCAwIDY0IDY0IiB4PSIwcHgiIHk9IjBweCI+PHRpdGxlPmNsb3VkLXVwPC90aXRsZT48cGF0aCBkPSJNMjUuMzMzIDkuMzMzYy05LjU3MyAwLTE3LjMzMyA3LjczMy0xNy4zMzMgMTcuMzMzIDAgMC0wLjAwMS0wLjAwMSAwIDAuMjY2LTQuNzU3IDIuNC04IDcuMjAxLTggMTMuMDY4IDAgOCA2LjU2NiAxNC42NjcgMTQuNjY3IDE0LjY2N2gzNmM3LjM2MyAwIDEzLjMzMy02LjEzMyAxMy4zMzMtMTMuMzMzIDAtNS42LTMuNDU5LTEwLjM5OC04LjMzMy0xMi41MzEgMC4xODktMC41MzMgMC4zMzMtMS4zMzUgMC4zMzMtMi4xMzUgMC01LjMzMy00LjE3OS05LjMzMy05LjMzMy05LjMzMy0yLjEyOCAwLTQuMDk2IDAuNTMxLTUuNjY3IDEuODY1LTIuNzgxLTUuODY3LTguNzUyLTkuODY1LTE1LjY2Ny05Ljg2NXpNMzIgMjIuNjY3bDEwLjY2NyAxMy4zMzNoLTUuMzMzdjEzLjMzM2gtMTAuNjY3di0xMy4zMzNoLTUuMzMzeiI+PC9wYXRoPjwvc3ZnPg==");
 }
 
-.modal.show footer button {
-	width: 100%;
-}
-
 .modal table.config {
 	width: 100%;
 	margin: 10px 0;
@@ -628,6 +621,22 @@ main #songs label,
 
 .modal table.config td[reset="true"] {
 	opacity: .2;
+}
+
+.modal footer {
+	width: 100%;
+}
+
+.modal.show footer button {
+	flex-grow: 1;
+}
+
+.modal .hidden {
+	position: absolute;
+	left: -99999px;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
 }
 
 .close::after {
@@ -651,8 +660,13 @@ main #songs label,
 
 #content.copyright {
 	bottom: 0;
-	font-size: 2.5vw;
-	line-height: 3.5vw;
+	transition: opacity .4s;
+	transition-delay: 4s;
+}
+
+#content.copyright p {
+	font-size: 2vw;
+	line-height: 2.5vw;
 }
 
 html,
