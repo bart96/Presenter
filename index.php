@@ -1,6 +1,6 @@
 <?php
 
-    function file_prevent_caching($path) {
+    function file_prevent_caching($path) : void {
         echo $path . '?v=' . base_convert(filemtime($path), 10, 35);
     }
 
@@ -33,15 +33,19 @@
         */
 
 		new DragNDrop(e, ['text/plain'], 'over', element.from('#songs')).onFileLoaded(text => {
-			CCLISong.parse(text).exists(s => {
-				let message = 'The song "' + s.title + '" with number "' + s.songNumber
-					+ '" already exists.\nDo you want to override it?';
+			CCLISong.parse(text).exists().then(({exists, song}) => {
+				if(exists) {
+					let message = `The song "${song.title}" with number "${song.songNumber}" already exists\n`
+						+ 'Do you want to override it?';
 
-				if(Config.get('overrideSongByImport', false) || confirm(message)) {
-					storage.addSong(s).upload();
+					if(Config.get('overrideSongByImport', false) || confirm(message)) {
+						storage.addSong(song).upload(true);
+					}
 				}
-            }, s => {
-				storage.addSong(s).upload();
+				else {
+					storage.addSong(song).upload();
+				}
+
             });
 		}).onError(console.log);
 	})(element.from('main'));

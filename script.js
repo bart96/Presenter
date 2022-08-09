@@ -1,8 +1,14 @@
 
+const SONG_UNKNOWN = 'UNKNOWN';
 const CUSTOM_NUMBER_LIMIT = 10000;
 const SONG_SEPARATOR = '---';
 
 class element {
+	/**
+	 * HTMLElement
+	 */
+	element;
+
 	constructor(type) {
 		if(!type) {
 			throw Error('Type is not defined');
@@ -250,12 +256,12 @@ class element {
 	}
 
 	on(event, listener) {
-		this.element['on' + event] = listener;
+		this.element[`on${event}`] = listener;
 		return this;
 	}
 
 	ignore(event) {
-		this.element['on' + event] = e => {
+		this.element[`on${event}`] = e => {
 			e.preventDefault();
 			e.stopPropagation();
 		}
@@ -460,7 +466,7 @@ class DragNDrop {
 					});
 				} else {
 					$.errors.forEach(fn => {
-						fn('Filetype "' + file.type + '" for file "' + file.name + '" not supported');
+						fn(`Filetype "${file.type}" for file "${file.name}" not supported`);
 					});
 				}
 			});
@@ -496,7 +502,6 @@ class DragNDrop {
 				return;
 			}
 
-			//e.stopPropagation();
 			e.preventDefault();
 			e.dataTransfer.dropEffect = 'copy';
 
@@ -506,7 +511,7 @@ class DragNDrop {
 		});
 
 		if(dragClass) {
-			target.listener('dragleave', e => {
+			target.listener('dragleave', _ => {
 				$.element.classList.remove(dragClass);
 			});
 		}
@@ -549,107 +554,94 @@ class Loadable {
 	}
 }
 
-const AJAX = new (function() {
-	let init = (method, url, callback) => {
-		let xhttp;
-
-		if (window.XMLHttpRequest) {
-			xhttp = new XMLHttpRequest();
-		} else {
-			xhttp = new ActiveXObject("Microsoft.XMLHTTP");
+class AJAX {
+	static statusHandler(response) {
+		if(response.ok) {
+			return response.json();
 		}
 
-		xhttp.open(method, url, true);
-		xhttp.onreadystatechange = function () {
-			if (this.readyState === 4) {
-				if(this.status === 200) {
-					callback.success(this.responseText);
+		return response.json().then(json => {
+			if(json.hasOwnProperty('message')) {
+				throw new Error(`${response.status} ${json.message}`);
+			}
+
+			throw new Error(`${response.status} ${response.statusText}`)
+		});
+	}
+
+	static get(url) {
+		return fetch(url, {
+			method: 'GET',
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		}).then(this.statusHandler);
+	}
+
+	static post(url, data) {
+		return fetch(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify(data)
+		}).then(this.statusHandler);
+	}
+
+	static put(url, data) {
+		return fetch(url, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(data)
+		}).then(this.statusHandler);
+	}
+
+	static delete(url, data) {
+		return fetch(url, {
+			method: 'DELETE',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(data)
+		}).then(this.statusHandler);
+	}
+
+	static form(url, data) {
+		const formData = new FormData();
+
+		if(data) {
+			if(typeof data === "object") {
+				for(const [key, value] of Object.entries(data)) {
+					if(typeof value === 'string' || value instanceof String) {
+						formData.append(key, value);
+					}
+					else {
+						formData.append(key, JSON.stringify(value));
+					}
+				}
+			}
+			else {
+				if(typeof data === 'string' || data instanceof String || typeof data === 'number') {
+					formData.append('data', data);
 				}
 				else {
-					callback.error(this.responseText);
+					formData.append('data', JSON.stringify(data));
 				}
-			}
-		};
-
-		return xhttp;
-	};
-
-	let convert = (params) => {
-		if(params && typeof params === "object") {
-			let p = [];
-			Object.entries(params).forEach(e => {
-				p.push(e[0] + '=' + e[1]);
-			});
-
-			return p.join('&');
-		}
-
-		return params;
-	};
-
-	this.get = (url) => {
-		let success, error;
-		let xhttp = init('GET', url, {
-			success: (r) => {
-				if(success) {
-					success(r);
-				}
-			},
-			error: (r) => {
-				if(error) {
-					error(r);
-				}
-			}
-		});
-		xhttp.send();
-
-		let $ = {
-			success: fn => {
-				success = fn;
-				return $;
-			},
-			error: fn => {
-				error = fn;
-				return $;
 			}
 		}
 
-		return $;
-	};
-
-	this.post = (url, params) => {
-		let success, error;
-		let xhttp = init('POST', url, {
-			success: (r) => {
-				if(success) {
-					success(r);
-				}
-			},
-			error: (r) => {
-				if(error) {
-					error(r);
-				}
-			}
-		});
-		xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-		xhttp.send(convert(params));
-
-		let $ = {
-			success: fn => {
-				success = fn;
-				return $;
-			},
-			error: fn => {
-				error = fn;
-				return $;
-			}
-		}
-
-		return $;
+		return fetch(url, {
+			method: 'POST',
+			body: formData
+		}).then(this.statusHandler);
 	}
-})();
+}
 
 class Storable extends Loadable {
+	data;
+
 	constructor(itemName, data) {
 		super();
 
@@ -662,7 +654,7 @@ class Storable extends Loadable {
 		this.itemName = itemName;
 		this.data = data;
 
-		this.addOnLoadListener(() => {
+		this.addOnLoadListener(_ => {
 			this.load();
 		});
 	}
@@ -686,7 +678,7 @@ class Storable extends Loadable {
 			this.convert(data);
 		}
 		catch(e) {
-			Notification.warning('Couldn\'t load data "' + this.itemName + '" from localStorage: ' + e.message);
+			Notification.warning(`Couldn't load data "${this.itemName}" from localStorage: ${e.message}`);
 		}
 	}
 
@@ -717,7 +709,7 @@ class Storage extends Storable {
 
 				for(let i in data.songs) {
 					let song = new CCLISong(data.songs[i]);
-					song.addSubscriber((type, song) => this.changeSong(type, song));
+					song.addSubscriber((... params) => this.changeSong(... params));
 					this.data.songs[i] = song;
 				}
 
@@ -741,13 +733,9 @@ class Storage extends Storable {
 		});
 	}
 
-	has(song) {
-		if(song && song.id) {
-			return this.data.songs[song.id];
-		}
-
-		if(Number.isInteger(song)) {
-			return this.data.songs[song];
+	has({id}) {
+		if(id) {
+			return this.data.songs[id];
 		}
 
 		return false;
@@ -766,10 +754,9 @@ class Storage extends Storable {
 	}
 
 	get changeHandler() {
-		return function(type) {
-			let params = Array.from(arguments).slice(1);
-
+		return (type, ... params) => {
 			switch(type) {
+				case 'newSong':
 				case 'downloadSong':
 					this.addSong(... params);
 					break;
@@ -788,8 +775,9 @@ class Storage extends Storable {
 				case 'deleteShow':
 					this.deleteShow(... params);
 					break;
+				//default: console.log(type);
 			}
-		}.bind(this);
+		};
 	}
 
 	addSong(song) {
@@ -800,10 +788,11 @@ class Storage extends Storable {
 		}
 		else {
 			this.data.songs[song.id] = song;
-			song.addSubscriber((type, song) => this.changeSong(type, song));
+			song.addSubscriber((... params) => this.changeSong(... params));
 		}
 
 		this.notifySubscriber('addSong', song);
+		this.save();
 
 		return song;
 	}
@@ -811,13 +800,15 @@ class Storage extends Storable {
 	changeSong(type, song, value) {
 		switch(type) {
 			case 'songId':
-				this.data.order.map(o => o === value ? song.id : o);
+				this.data.order = this.data.order.map(o => o === value ? song.id : o);
 
 				delete this.data.songs[value];
 				this.data.songs[song.id] = song;
+
+				this.save();
 				break;
 			default:
-				console.log(type, song, value);
+				//console.log(type, song, value);
 		}
 
 		this.notifySubscriber('changeSong', song, value);
@@ -845,73 +836,54 @@ class Storage extends Storable {
 		this.data.order = order;
 	}
 
-	uploadShow(show) {
+	uploadShow({title}) {
 		if(this.data.order.length < 1) {
 			Notification.error('You\'ll need to add a song first');
 			return;
 		}
 
-		AJAX.post('rest.php?shows=upload', {
-			data: JSON.stringify({
-				show: show,
-				order: this.data.order
-			})
-		}).success(r => {
-			Notification.rest(r);
-		}).error(r => {
-			Notification.rest(r);
-		});
+		AJAX.post('rest/Shows', {
+			title: title,
+			order: this.data.order
+		})
+		.then(e => Notification.success(e))
+		.catch(e => Notification.error(e));
 	}
 
 	downloadShow(show) {
-		AJAX.get('rest.php?shows=download&title=' + encodeURIComponent(show)).success(r => {
-			let json = JSON.parse(r);
+		let order = show.order.filter(songNumber => songNumber > 0);
+		this.notifySubscriber('clearSongs');
+		this.data.order = [];
+		this.data.songs = {};
 
-			if(!json.order) {
+		let songs = Array.from(new Set(order));
+
+		const downloadJob = _ => {
+			if(songs.length < 1) {
+				order.forEach(id => {
+					if(this.has({id})) {
+						this.addSong({id: id});
+					}
+				});
+
+				this.save();
 				return;
 			}
 
-			let $ = this;
-			this.notifySubscriber('clearSongs');
-			this.data.order = [];
-			this.data.songs = {};
+			CCLISong.download(songs.shift()).then(song => {
+				this.data.songs[song.id] = song;
+				downloadJob();
+			}).catch(e => {
+				Notification.error(e);
+				downloadJob();
+			});
+		}
 
-			let songs = Array.from(new Set(json.order));
-
-			function downloadsCompleted() {
-				json.order.forEach(id => {
-					$.addSong({id: id});
-				});
-
-				// ToDo save
-				$.save();
-			}
-
-			function downloadJob() {
-				if(!songs.length) {
-					downloadsCompleted();
-					return;
-				}
-
-				CCLISong.download(songs.shift()).success(song => {
-					$.data.songs[song.id] = song;
-					downloadJob();
-				}).error(r => {
-					Notification.rest(r);
-					downloadJob();
-				});
-			}
-
-			downloadJob();
-		}).error(r => {
-			Notification.rest(r);
-		});
+		downloadJob();
 	}
 
-	deleteShow(show) {
-		AJAX.get('rest.php?shows=delete&title=' + encodeURIComponent(show)).error(r => {
-			Notification.rest(r);
-		});
+	deleteShow({title}) {
+		AJAX.delete(`rest/Shows/`, {title}).catch(e => Notification.error(e));
 	}
 }
 
@@ -927,11 +899,11 @@ const Modal = new class {
 		this.footer = new element('footer').parent(this.container);
 
 		this.title = new element('h2').parent(header);
-		new element('button').html('&times;').parent(header).on('click', e => {
+		new element('button').html('&times;').parent(header).on('click', _ => {
 			this.close();
 		});
 
-		this.apply = new element('button').type('submit').text('OK').on('click', e => {
+		this.apply = new element('button').type('submit').text('OK').on('click', _ => {
 			if(this.callback) {
 				if(this.callback() === false) {
 					return;
@@ -941,7 +913,7 @@ const Modal = new class {
 			this.close();
 		})
 
-		document.addEventListener("DOMContentLoaded", () => {
+		document.addEventListener("DOMContentLoaded", _ => {
 			document.body.insertBefore(this.modal.element, document.body.firstChild);
 		});
 	}
@@ -1020,7 +992,7 @@ const Account = new class {
 			license: 0
 		}, JSON.parse(localStorage.getItem('account') || '{}'));
 
-		if(this.data.mail && !isNaN(parseInt(this.data.license))) {
+		if(this.data.mail && this.data.license) {
 			this.request();
 		}
 	}
@@ -1037,12 +1009,12 @@ const Account = new class {
 		return this;
 	}
 
-	notifySubscriber() {
-		this.subscribers.forEach(fn => fn(... arguments));
+	notifySubscriber(... params) {
+		this.subscribers.forEach(fn => fn(... params));
 	}
 
 	request(success) {
-		AJAX.post('rest.php?login', this.data).success(r => {
+		AJAX.post('rest/Session/', this.data).then(r => {
 			this.isLoggedIn = true;
 			localStorage.setItem('account', JSON.stringify(this.data));
 
@@ -1051,9 +1023,9 @@ const Account = new class {
 			}
 
 			this.notifySubscriber('login', this.isLoggedIn);
-		}).error(r => {
+		}).catch(e => {
 			this.isLoggedIn = false;
-			Notification.rest(r);
+			Notification.error(e);
 
 			this.notifySubscriber('login', this.isLoggedIn);
 		});
@@ -1064,14 +1036,14 @@ const Account = new class {
 		let mail = new element('input').type('mail').name('mail').placeholder('Mail ...').value(this.data.mail).parent(wrapper);
 		let license = new element('input').type('text').name('license').placeholder('CCLI License ...').value(this.data.license).parent(wrapper);
 
-		Modal.show('Login', wrapper).width('400px').onApply(r => {
+		Modal.show('Login', wrapper).width('400px').onApply(_ => {
 			this.data = {
 				mail: mail.value().trim(),
 				license: parseInt(license.value().trim()) || 0
 			};
 
-			this.request(r => {
-				Notification.rest(r);
+			this.request(e => {
+				Notification.success(e);
 				Modal.close();
 			});
 		});
@@ -1083,24 +1055,33 @@ const Notification = new class extends Loadable {
 		super();
 		this.container = new element('ul').id('alerts');
 
-		this.addOnLoadListener(() => {
+		this.addOnLoadListener(_ => {
 			this.container.parent(document.body);
 		});
 	}
 
 	message(message, type) {
-		while(this.container.children.length > 2) {
+		while(this.container.children.length > Config.get('notificationCount', 4)) {
 			this.container.popChild();
 		}
 
+		if(typeof message !== 'string') {
+			if(message.message) {
+				message = message.message;
+			}
+			else {
+				message = JSON.stringify(message);
+			}
+		}
+
 		let alert = new element('div').class('alert', type).text(message).parent(this.container).attribute('data-created', Date.now());
-		new element('button').type('button').text('×').tooltip('close').parent(alert).on('click', r => {
+		new element('button').type('button').text('×').tooltip('close').parent(alert).on('click', _ => {
 			alert.remove();
 		});
 
-		setTimeout(() => {
+		setTimeout(_ => {
 			alert.remove();
-		}, Config.get('notificationDisappearTime', 3000));
+		}, Config.get('notificationDisappearTime', 3500));
 	}
 
 	success(message) {
@@ -1113,32 +1094,6 @@ const Notification = new class extends Loadable {
 
 	error(message) {
 		this.message(message, 'error');
-	}
-
-	rest(json) {
-		try {
-			let data = JSON.parse(json);
-
-			if(data.success) {
-				data.success.forEach(message => {
-					this.success(message);
-				});
-			}
-			if(data.warnings) {
-				data.warnings.forEach(message => {
-					this.warning(message);
-				});
-			}
-			if(data.errors) {
-				data.errors.forEach(message => {
-					this.error(message);
-				})
-			}
-		}
-		catch(e) {
-			Notification.error(json);
-			this.error(json);
-		}
 	}
 }
 
@@ -1200,10 +1155,8 @@ const PopUp = new class {
 			this.popup = window.open('view.php', '_blank', 'toolbar=no,scrollbars=no,resizable=yes,width=450,height=300');
 
 			if(this.popup) {
-				this.popup.onload = e => {
-					this.loaded.forEach(fn => {
-						fn();
-					});
+				this.popup.onload = _ => {
+					this.loaded.forEach(fn => fn());
 				}
 			}
 		}
@@ -1244,7 +1197,7 @@ const PopUp = new class {
 			return;
 		}
 
-		this.popup.document.body.id = 'song_' + id;
+		this.popup.document.body.id = `song_${id}`;
 
 		let content = this.popup.document.querySelector('#content');
 
@@ -1299,7 +1252,7 @@ class GUI extends Loadable {
 
 		this.expand = new element('div').id('expand').parent(document.body);
 
-		new element('li').class('sidebar').parent(this.elementNav).on('click', e => {
+		new element('li').class('sidebar').parent(this.elementNav).on('click', _ => {
 			let shrunk = !Config.get('shrinkSidebar', false);
 
 			Config.set('shrinkSidebar', shrunk);
@@ -1311,12 +1264,12 @@ class GUI extends Loadable {
 				document.body.classList.remove('shrunk');
 			}
 		}).tooltip('Sidebar');
-		new element('li').class('search').parent(this.elementNav).on('click', e => {
+		new element('li').class('search').parent(this.elementNav).on('click', _ => {
 			if(this.elementNav.classList.toggle('search')) {
 				this.search.focus().select();
 			}
 		}).tooltip('Toggle search');
-		new element('li').class('add').parent(this.elementNav).on('click', e => {
+		new element('li').class('add').parent(this.elementNav).on('click', _ => {
 			let name = Config.get('defaultVerseName', 'Vers 1');
 			let blocks = {};
 			blocks[name] = '';
@@ -1332,29 +1285,19 @@ class GUI extends Loadable {
 		new element('li').class('fill').parent(this.elementNav);
 		let search = new element('div').id('search').parent(this.elementNav);
 
-		this.save = new element('li').class('shows').on('click', e => {
+		this.save = new element('li').class('shows').on('click', _ => {
 			let copy = new element('textarea').class('hidden');
 			let wrapper = new element('ul').class('shows');
 
-			AJAX.get('rest.php?shows=CCLI&limit=' + Config.get('showLimit', 30)).success(r => {
-				let result = [];
-
-				JSON.parse(r).forEach(show => {
-					result.push([show.title, ... show.songNumbers].join('\n'));
-				});
-
-				copy.value(result.join('\n\n'));
-			});
-
-			let newShow = new element('button').class('upload').text('New show').on('click', e => {
+			let newShow = new element('button').class('upload').text('New show').on('click', _ => {
 				let d = new Date();
 				let format = Config.get('ShowSaveFormat', 'Show {dd}.{MM}.{yyyy}');
 
 				function z(n) {
-					return ((n < 10) ? '0' : '') + n;
+					return (n < 10) ? `0${n}` : `${n}`;
 				}
 
-				let show = format
+				let title = format
 					.replace(/\{yyyy}/g, d.getFullYear())
 					.replace(/\{MM}/g, z(d.getMonth() + 1))
 					.replace(/\{dd}/g, z(d.getDate()))
@@ -1362,66 +1305,76 @@ class GUI extends Loadable {
 					.replace(/\{mm}/g, z(d.getMinutes()))
 					.replace(/\{ss}/g, z(d.getSeconds()));
 
-				show = prompt('Name of the show', show);
+				title = prompt('Name of the show', title);
 
-				if(!show) {
+				if(!title) {
 					return;
 				}
 
-				this.notifySubscriber('uploadShow', show);
+				this.notifySubscriber('uploadShow', {title});
 				loadShows(this);
 			});
 
-			let CCLIList = new element('button').text('Copy CCLI list').on('click', e => {
+			let CCLIList = new element('button').text('Copy CCLI list').on('click', _ => {
 				copy.copy();
 				Notification.success('Copied CCLI list to clipboard');
 			}).child(copy);
 
 			function loadShows($) {
-				AJAX.get('rest.php?shows&limit=' + Config.get('showLimit', 30)).success(r => {
+				AJAX.get(`rest/Shows/${Config.get('showLimit', 30)}`).then(shows => {
 					wrapper.clear();
 
-					JSON.parse(r).forEach(show => {
-						let li = new element('li').text(show).parent(wrapper).on('dblclick', e => {
+					shows.forEach(show => {
+						let li = new element('li').text(show.title).parent(wrapper).on('dblclick', _ => {
 							$.notifySubscriber('downloadShow', show);
 							Modal.close();
 						});
 
-						new element('button').type('button').class('upload').tooltip('upload').parent(li).on('click', e => {
+						new element('button').type('button').class('upload').tooltip('upload').parent(li).on('click', _ => {
 							if(!Config.get('confirmShowOverwrite', true) || confirm('Overwrite show?')) {
 								$.notifySubscriber('uploadShow', show);
 								loadShows($);
 							}
 						});
 
-						new element('button').type('button').text('×').tooltip('delete').parent(li).on('click', e => {
+						new element('button').type('button').text('×').tooltip('delete').parent(li).on('click', _ => {
 							if(!Config.get('confirmShowDeletion', true) || confirm('Delete show?')) {
 								$.notifySubscriber('deleteShow', show);
 								li.remove();
 							}
 						});
 					});
-				}).error(r => {
-					Notification.rest(r);
+				}).catch(e => {
+					Notification.error(e);
 					this.save.remove();
 				});
 			}
 
 			loadShows(this);
 			Modal.show('Shows', wrapper).width('375px').resizable('235px').foot(newShow, CCLIList);
+
+			AJAX.get(`rest/ShowsNumbers/${Config.get('showLimit', 30)}`).then(shows => {
+				let result = [];
+
+				shows.forEach(({title, songNumbers}) => {
+					result.push([title, ... songNumbers].join('\n'));
+				});
+
+				copy.value(result.join('\n\n'));
+			}).catch(e => Notification.error(e));
 		}).tooltip('Shows');
 
-		this.account = new element('li').class('account').parent(this.elementNav).on('click', e => {
+		this.account = new element('li').class('account').parent(this.elementNav).on('click', _ => {
 			Account.login();
 		}).tooltip('Account');
 
-		let window = new element('li').class('popup').parent(this.elementNav).on('click', e => {
+		let window = new element('li').class('popup').parent(this.elementNav).on('click', _ => {
 			PopUp.show();
-		}).on('contextmenu', e => {
+		}).on('contextmenu', _ => {
 			PopUp.toggleVisibility();
 		}).tooltip('Block screen popup');
 
-		PopUp.onLoad(e => {
+		PopUp.onLoad(_ => {
 			this.updatePopup();
 		}).onVisibilityChange((hide, black) => {
 			if(hide) {
@@ -1439,7 +1392,7 @@ class GUI extends Loadable {
 			}
 		});
 
-		new element('li').class('config').parent(this.elementNav).on('click', e => {
+		new element('li').class('config').parent(this.elementNav).on('click', _ => {
 			this.showConfig();
 		}).tooltip('Configuration');
 
@@ -1454,7 +1407,7 @@ class GUI extends Loadable {
 
 		this.search = new element('input').parent(search);
 		let searchResults = new element('ul').parent(search);
-		let searchRequest = fulltext => {
+		let searchRequest = mode => {
 			if(!Account.isLoggedIn) {
 				searchResults.clear();
 				Notification.error('Please log in');
@@ -1467,57 +1420,53 @@ class GUI extends Loadable {
 				searchResults.clear();
 			}
 			else {
-				AJAX.post('rest.php?search' + (fulltext ? '&text' : ''), {
-					subject: subject
-				}).success(r => {
+				if(mode === 'title' && /^\d+$/.test(subject)) {
+					mode = 'number';
+				}
+
+				AJAX.get(`rest/SongsSearch/${mode}?q=${subject}`).then(songs => {
 					searchResults.clear();
 
-					JSON.parse(r).forEach(song => {
-						new element('li').text('(' + song.songNumber + ') ' + song.title).parent(searchResults).on('mousedown', e => {
-							CCLISong.download(song.songNumber).success(r => {
+					songs.forEach(song => {
+						new element('li').text(`(${song.songNumber}) ${song.title}`).parent(searchResults).on('mousedown', _ => {
+							CCLISong.download(song.songNumber).then(r => {
 								this.notifySubscriber('downloadSong', r);
-							});
+							}).catch(e => Notification.error(e));
 						});
 					});
-				}).error(r => {
+				}).catch(e => {
 					searchResults.clear();
-					Notification.rest(r);
+					Notification.error(e);
 				});
 			}
 		};
-		new element('button').type('button').class('all').parent(search).on('click', e => {
-			AJAX.get('rest.php?search&all&order=' + Config.get('songOverviewOrder', 'lexicographic|numeric')).success(r => {
+		new element('button').type('button').class('all').parent(search).on('click', _ => {
+			AJAX.get(`rest/SongsAll/${Config.get('songOverviewOrder', 'lexicographic|numeric')}`).then(songs => {
 				let wrapper = new element('ul').class('songs');
 
-				JSON.parse(r).forEach(song => {
-					let name = '(' + song.songNumber + ') ' + song.title;
-
+				songs.forEach(song => {
 					let li = new element('li').parent(wrapper);
-					new element('span').text(name).parent(li).on('dblclick', e => {
-						CCLISong.download(song.songNumber).success(r => {
+					new element('span').text(`(${song.songNumber}) ${song.title}`).parent(li).on('dblclick', _ => {
+						CCLISong.download(song.songNumber).then(r => {
 							this.notifySubscriber('downloadSong', r);
-							Notification.success('Successfully added "' + song.title + '"');
-						});
+							Notification.success(`Successfully added "${song.title}"`);
+						}).catch(e => Notification.error(e));
 					});
 
 					if(Config.get('showRemoveSongFromDatabase', false)) {
-						new element('button').class('close').parent(li).on('click', e => {
-							if(confirm('Do you really want to remove the song "' + song.title + '" from the database?')) {
-								AJAX.get('rest.php?song=' + song.songNumber + '&delete').success(r => {
+						new element('button').class('close').parent(li).on('click', _ => {
+							if(confirm(`Do you really want to remove the song "${song.title}" from the database?`)) {
+								AJAX.delete('rest/Song', {songNumber: song.songNumber}).then(e => {
 									li.remove();
-									Notification.rest(r);
-								}).error(r => {
-									Notification.rest(r);
-								});
+									Notification.success(e);
+								}).catch(e => Notification.error(e));
 							}
 						})
 					}
 				});
 
 				Modal.show('All songs', wrapper).width('800px').resizable('310px');
-			}).error(r => {
-				Notification.rest(r);
-			});
+			}).catch(e => Notification.error(e));
 		});
 
 		this.search.on('drop', e => {
@@ -1526,12 +1475,12 @@ class GUI extends Loadable {
 			if(text) {
 				this.search.value(text);
 			}
-		}).on('input', e => {
-			searchRequest();
+		}).on('input', _ => {
+			searchRequest('title');
 		}).on('keypress', e => {
 			switch(e.key) {
 				case 'Enter':
-					searchRequest(true);
+					searchRequest('text');
 					break;
 			}
 		});
@@ -1587,6 +1536,7 @@ class GUI extends Loadable {
 					if(!e.ctrlKey) {
 						return;
 					}
+					break;
 				case 'F12':
 					break;
 				default:
@@ -1598,7 +1548,7 @@ class GUI extends Loadable {
 			e.stopPropagation();
 		};
 
-		this.addOnLoadListener(() => {
+		this.addOnLoadListener(_ => {
 			if(Config.get('shrinkSidebar', false)) {
 				document.body.classList.add('shrunk');
 			}
@@ -1620,9 +1570,7 @@ class GUI extends Loadable {
 	}
 
 	get changeHandler() {
-		return function(type) {
-			let params = Array.from(arguments).slice(1);
-
+		return (type, ... params) => {
 			switch(type) {
 				case 'addSong':
 					this.addSong(... params);
@@ -1631,7 +1579,7 @@ class GUI extends Loadable {
 					this.elementSongs.clear();
 					break;
 			}
-		}.bind(this);
+		};
 	}
 
 	addSong(song) {
@@ -1664,7 +1612,7 @@ class GUI extends Loadable {
 					}
 				}
 			})
-			.on('dragend', () => {
+			.on('dragend', _ => {
 				this.songToMove.classList.remove('dragged');
 				this.songToMove = null;
 
@@ -1676,7 +1624,7 @@ class GUI extends Loadable {
 
 				this.notifySubscriber('songOrder', order);
 			})
-			.on('mouseenter', () => {
+			.on('mouseenter', _ => {
 				this.expand.text(song.title);
 				this.expand.style('top', li.rect.top + 'px');
 				this.expand.className('visible');
@@ -1686,7 +1634,7 @@ class GUI extends Loadable {
 				}
 
 			})
-			.on('mouseleave', () => {
+			.on('mouseleave', _ => {
 				this.expand.classList.remove('visible');
 			})
 			.attribute('draggable', 'true')
@@ -1706,7 +1654,7 @@ class GUI extends Loadable {
 				e.preventDefault();
 				this.editSong(song, li);
 			})
-			.on('touchstart', e => {
+			.on('touchstart', _ => {
 				window.touchStartTimer = Date.now();
 			})
 			.on('touchend', e => {
@@ -1808,7 +1756,7 @@ class GUI extends Loadable {
 	}
 
 	showSong(song, li) {
-		this.current.id = song.songNumber;
+		this.current.id = song.id;
 		this.current.index = 0;
 		this.current.text = [];
 
@@ -1822,8 +1770,8 @@ class GUI extends Loadable {
 
 		let block = null;
 		song.order.forEach(order => {
-			let createBlock = () => {
-				let block = new element('span').parent(this.elementControl).on('contextmenu', e => {
+			let createBlock = _ => {
+				let block = new element('span').parent(this.elementControl).on('contextmenu', _ => {
 					/*
 					if(block.classList.contains('hidden')) {
 						block.classList.remove('hidden');
@@ -1832,12 +1780,12 @@ class GUI extends Loadable {
 					else {
 						block.classList.add('hidden');
 						// TODO hide live elements (maybe a listener from line to block???)
-						// ?? change tagname ??
+						// ?? change tagName ??
 					}
 					 */
 				});
 
-				let header = new element('h1').text(order).parent(block).listener('click', e => {
+				let header = new element('h1').text(order).parent(block).listener('click', _ => {
 					let index = Array.from(this.elementControl.getElementsByTagName('p')).indexOf(block.querySelector('p'));
 					this.current.index = index;
 					this.scrollTo(index, {
@@ -1906,7 +1854,7 @@ class GUI extends Loadable {
 
 			blocks[type] = block;
 
-			let li = new element('li').before(options).on('click', e => {
+			let li = new element('li').before(options).on('click', _ => {
 				currentBlock = type;
 				editBlock.value(blocks[type]);
 
@@ -1914,7 +1862,7 @@ class GUI extends Loadable {
 			});
 			new element('span').text(type).parent(li);
 
-			new element('button').type('button').class('close').parent(li).on('click', e => {
+			new element('button').type('button').class('close').parent(li).on('click', _ => {
 				if(ul.children.length < 3) {
 					Notification.error('You can\'t remove all blocks');
 					return;
@@ -1945,7 +1893,7 @@ class GUI extends Loadable {
 
 		let ul = new element('ul').class('options').parent(wrapper);
 		options.parent(ul);
-		new element('button').type('button').class('add').parent(options).on('click', e => {
+		new element('button').type('button').class('add').parent(options).on('click', _ => {
 			let name = prompt('Name', Config.get('newVerseValue', 'Outro'));
 
 			if(!name) {
@@ -1953,13 +1901,13 @@ class GUI extends Loadable {
 			}
 
 			if(Object.keys(blocks).includes(name)) {
-				Notification.error('Block "' + name + '" does already exist');
+				Notification.error(`Block "${name}" does already exist`);
 				return ;
 			}
 
 			createBlock(name, [], true);
 		});
-		new element('button').type('button').class('delete').parent(options).on('click', e => {
+		new element('button').type('button').class('delete').parent(options).on('click', _ => {
 			wrapper.classList.toggle('remove');
 		})
 
@@ -1969,7 +1917,7 @@ class GUI extends Loadable {
 		editOrder.class('order');
 
 		function add(index) {
-			let li = new element('li').on('click', e => {
+			let li = new element('li').on('click', _ => {
 				console.log(currentBlock);
 				add(li.index);
 				order(currentBlock, li.index);
@@ -1982,7 +1930,7 @@ class GUI extends Loadable {
 		function order(text, index) {
 			let li = new element('li');
 			new element('span').text(text).parent(li);
-			new element('button').class('close').parent(li).on('click', e => {
+			new element('button').class('close').parent(li).on('click', _ => {
 				li.parentElement.removeChild(li.previousElementSibling);
 				li.remove();
 			});
@@ -2004,7 +1952,7 @@ class GUI extends Loadable {
 
 		editOrder.parent(wrapper);
 
-		Modal.show('Song editor', wrapper).width('1200px').onApply(r => {
+		Modal.show('Song editor', wrapper).width('1200px').onApply(_ => {
 			if(!title.value()) {
 				Notification.error('Title is missing');
 				return false;
@@ -2053,11 +2001,18 @@ class GUI extends Loadable {
 				}
 			}
 			else {
-				this.addSong(song);
+				this.notifySubscriber('newSong', song);
 			}
 
 			if(Account.isLoggedIn) {
-				song.upload();
+				if(song.id < 0) {
+					void song.upload();
+				}
+				else {
+					AJAX.get(`rest/SongExists/${song.id}`).then(({exists}) => {
+						void song.upload(exists);
+					});
+				}
 			}
 		});
 	}
@@ -2067,7 +2022,7 @@ class GUI extends Loadable {
 
 		// ToDo there is a bug in here	script.js:1799:30	Uncaught TypeError: (new element(...)).text(...).parent is not a function
 		Config.forEach((v, k) => {
-			let tr = new element('tr').parent(table).on('contextmenu', e => {
+			let tr = new element('tr').parent(table).on('contextmenu', _ => {
 				let td = tr.querySelector('td');
 
 				if(td) {
@@ -2082,7 +2037,7 @@ class GUI extends Loadable {
 				.attribute('key', k)
 		});
 
-		Modal.show('Configuration', table).width('520px').resizable('173px').onApply(r => {
+		Modal.show('Configuration', table).width('520px').resizable('173px').onApply(_ => {
 			Array.from(table.getElementsByTagName('td')).forEach(td => {
 				let key = td.getAttribute('key');
 
@@ -2155,8 +2110,8 @@ class GUI extends Loadable {
 class Song {
 	constructor(obj) {
 		obj = Object.assign({
-			title: 'UNKNOWN',
-			songNumber: -1,
+			title: SONG_UNKNOWN,
+			songNumber: - Date.now(),
 			blocks: {},
 			initialOrder: [],
 			order: []
@@ -2165,20 +2120,20 @@ class Song {
 		this.changeListener = [];
 
 		this.title = obj.title;
-		this.id = obj.songNumber;
+		this.songNumber = obj.songNumber;
 		this.blocks = obj.blocks;
 		this.initialOrder = obj.initialOrder;
 		this.order = obj.order;
 	}
 
 	toJSON() {
-		let obj = { ...this };
+		const obj = { ...this };
 		delete obj.changeListener;
 		return obj;
 	}
 
 	set id(id) {
-		let old = this.songNumber;
+		const old = this.songNumber;
 		this.songNumber = id;
 
 		this.changeListener.forEach(fn => {
@@ -2241,6 +2196,8 @@ class Song {
 			throw new Error('"block" needs to be an array');
 		}
 
+		type = type.replaceAll(',', '');
+
 		if(!this.initialOrder.includes(type)) {
 			this.initialOrder.push(type);
 		}
@@ -2277,11 +2234,15 @@ class Song {
 	}
 
 	exists() {
-		throw new Error('Child class needs to implement the method "exists"');
+		return new Promise((_, reject) => {
+			reject('Child class needs to implement the method "exists"')
+		});
 	}
 
 	upload() {
-		throw new Error('Child class needs to implement the method "upload"');
+		return new Promise((_, reject) => {
+			reject('child class needs to implement the method "upload"')
+		});
 	}
 }
 
@@ -2292,19 +2253,19 @@ class CCLISong extends Song {
 		let duplicates = 0;
 
 		song.title = rows.splice(0, 3).shift();
-		song.account = parseInt(rows.pop().replace(/[^0-9]/g, ''));
+		song.account = parseInt(rows.pop().replace(/\D/g, ''));
 		do {
 			song.songNumber = rows.pop();
 		} while (!song.songNumber.startsWith('CCLI-'));
 
-		song.songNumber = parseInt(song.songNumber.replace(/[^0-9]/g, ''));
+		song.id = parseInt(song.songNumber.replace(/\D/g, ''));
 
 		rows.join('\n').split('\n\n\n').forEach(block => {
 			let row = block.split('\n').filter(e => { return e !== ''; });
 			let type = row.shift();
 
 			if(song.initialOrder.includes(type)) {
-				type += ' [' + (++duplicates) + ']';
+				type += ` [${++duplicates}]`;
 			}
 
 			song.order.push(type);
@@ -2316,50 +2277,9 @@ class CCLISong extends Song {
 	}
 
 	static download(songNumber) {
-		let success = e => {
-			console.log(e);
-		}
-		let error = e => {
-			Notification.rest(e);
-		}
-
-		AJAX.get('rest.php?song=' + songNumber).success(r => {
-			let obj = JSON.parse(r);
-
-			obj.order = obj.order.split(',');
-			obj.initialOrder = obj.initialOrder.split(',');
-
-			for(let i in obj.blocks) {
-				let block = [];
-
-				obj.blocks[i].split(' # ').forEach(line => {
-					block.push(line.replace(/\{#}/g, '#'));
-				});
-
-				obj.blocks[i] = block;
-			}
-
-			success(new CCLISong(obj));
-		}).error(error);
-
-		let result = {
-			success: fn => {
-				if(fn) {
-					success = fn;
-				}
-
-				return result;
-			},
-			error: fn => {
-				if(fn) {
-					error = fn;
-				}
-
-				return result;
-			}
-		}
-
-		return result;
+		return new Promise((resolve, reject) => {
+			AJAX.get(`rest/Song/${songNumber}`).then(song => resolve(new CCLISong(song))).catch(reject);
+		});
 	}
 
 	constructor(obj) {
@@ -2373,83 +2293,51 @@ class CCLISong extends Song {
 	}
 
 	get hasLicense() {
-		return this.songNumber >= CUSTOM_NUMBER_LIMIT;
+		return this.id >= CUSTOM_NUMBER_LIMIT;
 	}
 
 	get license() {
-		return Config.get('CCLISongnumber', 'CCLI-Liednummer') + ' ' + this.songNumber + '<br />'
-			+ Config.get('CCLILicensenumber', 'CCLI-Lizenznummer') + ' ' + this.account;
+		return Config.get('CCLISongnumber', 'CCLI-Liednummer') + ` ${this.id}<br />`
+			+ Config.get('CCLILicensenumber', 'CCLI-Lizenznummer') + ` ${this.account}`;
 	}
 
-	exists(existent, nonexistent) {
-		AJAX.get('rest.php?exists=' + this.songNumber).success(r => {
-			switch(r) {
-				case 'EXISTING':
-					existent(this);
-					break;
-				case 'MISSING':
-					nonexistent(this);
-					break;
-				default:
-					Notification.rest(r);
-			}
-		}).error(r => {
-			Notification.rest(r);
+	exists() {
+		return new Promise((resolve, reject) => {
+			AJAX.get(`rest/SongExists/${this.id}`).then(({exists}) => {
+				resolve({exists, song: this});
+			}).catch(reject);
 		});
-
-		return this;
 	}
 
-	upload() {
-		let success = e => {
-			let r = JSON.parse(e);
-			if(!r.data || isNaN(r.data.songNumber)) {
-				console.error('could not update songnumber properly', e);
+	upload(overwrite) {
+		return new Promise((resolve, reject) => {
+			let success = (song) => {
+				//const {account, songNumber, title, initialOrder, order, blocks} = song;
+				const {songNumber, title} = song;
+
+				console.log(song);
+
+				if(songNumber < 0 || isNaN(songNumber)) {
+					reject('could not update song number properly', song);
+				}
+				else {
+					this.id = parseInt(songNumber);
+
+					if(Config.get('showSongUploadNotifications', true)) {
+						Notification.success(`Song #${songNumber} "${title}" successfully uploaded`);
+					}
+
+					resolve(song);
+				}
+			};
+
+			if(overwrite) {
+				AJAX.put('rest/Song', this).then(success).catch(reject);
 			}
 			else {
-				this.songNumber = parseInt(r.data.songNumber);
+				AJAX.post('rest/Song', this).then(success).catch(reject);
 			}
-
-			if(Config.get('showSongUploadNotifications', true)) {
-				Notification.rest(e);
-			}
-		};
-		let error = e => {
-			Notification.rest(e);
-		};
-
-		let song = {
-			account: this.account,
-			songNumber: this.songNumber,
-			title: this.title,
-			order: this.order.join(','),
-			initialOrder: this.initialOrder.join(','),
-			blocks: {}
-		}
-
-		for(let i in this.blocks) {
-			let block = [];
-			this.blocks[i].forEach(b => {
-				block.push(b.replace(/#/g, '{#}'));
-			});
-
-			song.blocks[i] = block.join(' # ');
-		}
-
-		AJAX.post('rest.php?song', {song: JSON.stringify(song)}).success(success).error(error);
-
-		return {
-			success: fn => {
-				if(fn) {
-					success = fn;
-				}
-			},
-			error: fn => {
-				if(fn) {
-					error = fn;
-				}
-			}
-		}
+		});
 	}
 }
 

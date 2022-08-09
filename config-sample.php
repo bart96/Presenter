@@ -1,6 +1,9 @@
 <?php
 
-	define('DB_HOST', 'localhost');
-	define('DB_DATABASE', 'database');
-	define('DB_USER', 'user');
-	define('DB_PASSWORD', 'password');
+	const DB_HOST = 'localhost';
+	const DB_DATABASE = 'database';
+	const DB_USER = 'user';
+	const DB_PASSWORD = 'password';
+
+	const SEARCH_RESULT_LIMIT = 10;
+	const CUSTOM_NUMBER_LIMIT = 10000;
