@@ -114,13 +114,15 @@ class element {
 		return this;
 	}
 
-	child(child) {
-		if(child instanceof element) {
-			this.element.appendChild(child.element);
-		}
-		else {
-			this.element.appendChild(child);
-		}
+	child(... child) {
+		child.forEach(child => {
+			if(child instanceof element) {
+				this.element.appendChild(child.element);
+			}
+			else {
+				this.element.appendChild(child);
+			}
+		});
 
 		return this;
 	}
@@ -533,7 +535,7 @@ class Loadable {
 		this.loaded = false;
 		this.listener = [];
 
-		document.addEventListener("DOMContentLoaded", () => {
+		document.addEventListener('DOMContentLoaded', _ => {
 			while(this.listener.length) {
 				this.listener.shift()(this);
 			}
@@ -1137,13 +1139,27 @@ const Config = new class extends Storable {
 			}
 		}
 	}
+
+	load() {
+		super.load();
+
+		if(Config.get('hideMouse', true)) {
+			document.body.classList.add('hide-mouse');
+		}
+	}
 }
 
-const PopUp = new class {
+const PopUp = new class extends Loadable {
 	constructor() {
-		this.loaded = [];
-		this.visibility = [];
+		super();
+
+		this.loadListener = [];
+		this.changeListener = [];
 		this.popup = null;
+
+		this.addOnLoadListener(_ => {
+			document.body.setAttribute('data-loaded', `${Date.now()}`);
+		});
 	}
 
 	get inactive() {
@@ -1152,17 +1168,27 @@ const PopUp = new class {
 
 	show() {
 		if(this.inactive) {
-			this.popup = window.open('view.php', '_blank', 'toolbar=no,scrollbars=no,resizable=yes,width=450,height=300');
+			const params = Object.entries({
+				scrollbars: 'no',
+				resizable: 'no',
+				status: 'no',
+				location: 'no',
+				toolbar: 'no',
+				menubar: 'no',
+				fullscreen: 'yes',
+				top: Config.get('popupTop', 0),
+				left: Config.get('popupLeft', 0),
+				width: Config.get('popupWidth', '450'),
+				height: Config.get('popupHeight', '350')
+			}).map(x => x.join('=')).join(',');
+
+			this.popup = window.open('view.php', '_blank', params);
 
 			if(this.popup) {
 				this.popup.onload = _ => {
-					this.loaded.forEach(fn => fn());
+					this.loadListener.forEach(fn => fn(this.send));
 				}
 			}
-		}
-		else {
-			this.popup.document.body.classList.toggle('black');
-			this.visibilityUpdate();
 		}
 
 		return this;
@@ -1170,15 +1196,23 @@ const PopUp = new class {
 
 	onLoad(fn) {
 		if(fn) {
-			this.loaded.push(fn);
+			this.loadListener.push(fn);
 		}
 
 		return this;
 	}
 
-	onVisibilityChange(fn) {
+	onChange(fn) {
 		if(fn) {
-			this.visibility.push(fn);
+			this.changeListener.push(fn);
+		}
+
+		return this;
+	}
+
+	focus() {
+		if(!this.inactive) {
+			this.popup.focus();
 		}
 
 		return this;
@@ -1192,44 +1226,16 @@ const PopUp = new class {
 		return this;
 	}
 
-	updatePopup(id, html, classes, black, copyright) {
-		if(this.inactive) {
-			return;
+	send(message, ... params) {
+		if(!this.inactive) {
+			this.popup.handler(message, (... params) => {
+				this.changeListener.forEach(listener => {
+					listener(message, ... params);
+				});
+			}, ... params);
 		}
-
-		this.popup.document.body.id = `song_${id}`;
-
-		let content = this.popup.document.querySelector('#content');
-
-		if(!content) {
-			return;
-		}
-
-		content.className = classes + (black ? ' black' : '');
-		content.innerHTML = html;
-		content.style = copyright ? 'opacity: 0' : '';
 
 		return this;
-	}
-
-	toggleVisibility() {
-		if(this.inactive) {
-			return;
-		}
-
-		this.popup.document.body.classList.toggle('hide');
-		this.visibilityUpdate();
-
-		return this;
-	}
-
-	visibilityUpdate() {
-		this.visibility.forEach(fn => {
-			fn(
-				this.popup.document.body.classList.contains('hide'),
-				this.popup.document.body.classList.contains('black')
-			);
-		});
 	}
 }
 
@@ -1242,10 +1248,24 @@ class GUI extends Loadable {
 		super();
 		this.subscribers = [];
 
-		rootElement.on('contextmenu', e => e.preventDefault());
+		rootElement.on('contextmenu', e => {
+			if(Config.get('hideMouse', true)) {
+				e.preventDefault();
+			}
+		});
 
 		this.elementNav = new element('ul').id('nav').parent(rootElement);
-		this.elementControl = new element('div').class('wrapper').parent(new element('div').id('control').parent(rootElement));
+
+		const control = new element('div').id('control').parent(rootElement);
+		this.elementControl = new element('div').class('wrapper').parent(control);
+		this.overlay = new element('ul').class('overlay').parent(control);
+		this.overflowWarning = new element('li').text('Text is too long in at least one line !').on('click', _ => {
+			const overflow = this.elementControl.querySelector('.overflow');
+			if(overflow) {
+				overflow.scrollIntoView();
+			}
+		});
+
 		this.elementSongs = new element('ul').parent(new element('div').id('songs').parent(rootElement));
 		this.elementPreview = new element('div').id('preview').parent(rootElement)
 			.listener('contextmenu', e => e.preventDefault());
@@ -1368,31 +1388,42 @@ class GUI extends Loadable {
 			Account.login();
 		}).tooltip('Account');
 
-		let window = new element('li').class('popup').parent(this.elementNav).on('click', _ => {
-			PopUp.show();
+		let popupWindow = new element('li').class('popup').parent(this.elementNav).on('click', _ => {
+			if(PopUp.inactive) {
+				PopUp.show();
+			}
+			else {
+				PopUp.send('toggleVisibility', 'text');
+			}
 		}).on('contextmenu', _ => {
-			PopUp.toggleVisibility();
+			PopUp.send('toggleVisibility', 'background');
+		}).on('dblclick', _ => {
+			PopUp.focus();
 		}).tooltip('Block screen popup');
 
-		PopUp.onLoad(_ => {
-			this.updatePopup();
-		}).onVisibilityChange((hide, black) => {
-			if(hide) {
-				window.classList.add('hide');
-			}
-			else {
-				window.classList.remove('hide');
-			}
+		PopUp.onLoad(send => {
+			PopUp.send('song', this.current.id);
+			PopUp.send('visibility', 'mouse', Config.get('hideMouse', true));
 
-			if(black) {
-				window.classList.add('black');
-			}
-			else {
-				window.classList.remove('black');
+			this.updateActiveBlock(); // ToDo get current active block
+			// ToDo check if text is blacked?
+
+		}).onChange((message, ... params) => {
+			switch(message) {
+				case 'toggleVisibility':
+					const type = params[0];
+
+					if(params[1]) {
+						popupWindow.classList.add(`hide-${type}`);
+					}
+					else {
+						popupWindow.classList.remove(`hide-${type}`);
+					}
+					break;
 			}
 		});
 
-		new element('li').class('config').parent(this.elementNav).on('click', _ => {
+		this.config = new element('li').class('config').parent(this.elementNav).on('click', _ => {
 			this.showConfig();
 		}).tooltip('Configuration');
 
@@ -1506,18 +1537,18 @@ class GUI extends Loadable {
 				case 'Home':
 					this.current.index = 0;
 					this.scrollTo(0);
-					this.updatePopup();
+					this.updateActiveBlock();
 					break;
 				case 'ArrowUp':
 					if(this.current.index > 0) {
 						this.scrollTo(--this.current.index);
-						this.updatePopup();
+						this.updateActiveBlock();
 					}
 					break;
 				case 'ArrowDown':
 					if(this.current.index < this.elementPreview.children.length - 1) {
 						this.scrollTo(++this.current.index);
-						this.updatePopup();
+						this.updateActiveBlock();
 					}
 					break;
 				case 'KeyB':
@@ -1525,22 +1556,23 @@ class GUI extends Loadable {
 						return;
 					}
 
-					this.elementPreview.classList.toggle('black');
-					this.updatePopup();
-					break;
-				case 'Escape':
-				case 'F10':
-					this.showConfig();
+					PopUp.send('visibility', 'text', this.elementPreview.classList.toggle('hide-text'));
 					break;
 				case 'KeyF':
 					if(!e.ctrlKey) {
 						return;
 					}
 					break;
+				case 'Escape':
+				case 'F10':
+					this.showConfig();
+					break;
+				case 'F11':
+					break;
 				case 'F12':
 					break;
 				default:
-					//console.log(e.code)
+					//console.log(e.code);
 					return;
 			}
 
@@ -1552,6 +1584,33 @@ class GUI extends Loadable {
 			if(Config.get('shrinkSidebar', false)) {
 				document.body.classList.add('shrunk');
 			}
+
+			if(Config.get('showHideMouse', false)) {
+				new element('li').class('mouse').before(this.config).on('click', _ => {
+					const hideMouse = document.body.classList.toggle('hide-mouse');
+
+					Config.set('hideMouse', hideMouse);
+					PopUp.send('visibility', 'mouse', hideMouse);
+				}).tooltip('Hide Mouse');
+			}
+
+			const notMaximizedWarning = new element('li').text('Browser window is not maximized !').on('click', _ => {
+				window.moveTo(0, 0);
+				window.resizeTo(screen.availWidth, screen.availHeight);
+			});
+			const checkMaximized = _ => {
+				if(screen.availWidth - window.innerWidth === 0) {
+					notMaximizedWarning.remove();
+				}
+				else {
+					if(!notMaximizedWarning.parentElement) {
+						notMaximizedWarning.parent(this.overlay);
+					}
+				}
+			}
+
+			checkMaximized();
+			document.body.onresize = checkMaximized;
 
 			rootElement.attribute('theme', Config.get('theme', 'default|calibration|expert'));
 		});
@@ -1697,22 +1756,16 @@ class GUI extends Loadable {
 		return song;
 	}
 
-	updatePopup() {
-		if(PopUp.inactive) {
-			return;
+	updateActiveBlock() {
+		if(!PopUp.inactive) {
+			const active = this.elementControl.querySelector('span.active');
+
+			if(active) {
+				PopUp.send('active', active);
+			}
 		}
 
-		let active = this.elementControl.querySelector('span.active');
-
-		if(!active) {
-			return;
-		}
-
-		let black = this.elementPreview.classList.contains('black');
-		let copyright = active.classList.contains('copyright');
-		PopUp.updatePopup(this.current.id, active.innerHTML, active.className, black, copyright);
-
-		console.log(active);
+		return this;
 	}
 
 	addLine(block, line, className) {
@@ -1732,7 +1785,7 @@ class GUI extends Loadable {
 				scrollBehavior: Config.get('verseScrollBehaviour', 'auto')
 			});
 
-			this.updatePopup();
+			this.updateActiveBlock();
 		});
 
 		if(this.current.text.length < 1) {
@@ -1745,6 +1798,7 @@ class GUI extends Loadable {
 
 		if(previewLine.scrollWidth > this.elementPreview.offsetWidth) {
 			controlLine.class('overflow');
+			this.overflowWarning.parent(this.overlay);
 		}
 
 		if(className) {
@@ -1760,12 +1814,13 @@ class GUI extends Loadable {
 		this.current.index = 0;
 		this.current.text = [];
 
+		this.overflowWarning.remove();
 		this.elementControl.clear();
 		this.elementPreview.clear();
 		this.switchActive(this.elementSongs, li);
 
 		if(Config.get('resetBlackOnSongSwitch', false)) {
-			this.elementPreview.classList.remove('black');
+			this.elementPreview.classList.remove('hide-text');
 		}
 
 		let block = null;
@@ -1792,7 +1847,7 @@ class GUI extends Loadable {
 						scrollBehavior: Config.get('navScrollBehaviour', 'auto')
 					});
 
-					this.updatePopup();
+					this.updateActiveBlock();
 				});
 				block.data('nav', header);
 
@@ -1825,7 +1880,9 @@ class GUI extends Loadable {
 		}
 
 		this.elementControl.firstElementChild.scrollIntoView();
-		this.updatePopup();
+
+		PopUp.send('song', song.id);
+		this.updateActiveBlock();
 	}
 
 	editSong(song, li) {
@@ -1943,8 +2000,7 @@ class GUI extends Loadable {
 		song.order.forEach(e => {
 			order(e);
 			add();
-		})
-
+		});
 
 		song.initialOrder.forEach((order, i) => {
 			createBlock(order, song.blocks[order], i < 1);
@@ -2345,10 +2401,13 @@ window.onbeforeunload = e => {
 	if(Config.get('confirmPageLeave', true)) {
 		e.preventDefault();
 		e.returnValue = '';
+
+		PopUp.send('closing', document.body.getAttribute('data-loaded'));
+	}
+	else {
+		delete e['returnValue'];
+		PopUp.close();
 	}
 
-	delete e['returnValue'];
-
 	Storable.instances.forEach(i => i.save());
-	PopUp.close();
 }
