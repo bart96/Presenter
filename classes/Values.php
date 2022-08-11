@@ -133,7 +133,7 @@
 			return boolval($this->get($attribute, $default));
 		}
 
-		public function getAsObject(string $attribute, array | object $default = NULL) : array {
+		public function getAsObject(string $attribute, array | object $default = NULL) : object {
 			$value = $this->get($attribute, $default);
 
 			if(!is_object($value)) {

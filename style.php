@@ -23,26 +23,26 @@
 			box-sizing: border-box;
 		}
 
-		form {
-			position: fixed;
+		textarea {
+			position: absolute;
 			top: 0;
 			right: 0;
 			bottom: 0;
 			left: 0;
-			display: flex;
-			flex-direction: column;
-		}
-
-		textarea {
-			flex-grow: 1;
+			width: 100%;
+			height: 100%;
 			padding: 15px 25px;
 			resize: none;
 		}
 
 		button {
-			padding: 10px;
+			position: absolute;
+			top: 0;
+			right: 30px;
+			padding: 10px 25px;
 			cursor: pointer;
 			font-weight: bold;
+			font-size: 1.2em;
 		}
 
 		button:hover,
@@ -57,7 +57,7 @@
 	<form action="" method="post">
 		<textarea name="text"><?php echo htmlspecialchars(file_get_contents($file)) ?></textarea>
 
-		<button type="submit">Update</button>
+		<button type="submit">💾 Save</button>
 	</form>
 
 	<script type="text/javascript">
