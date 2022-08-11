@@ -1,6 +1,6 @@
 <?php
 
-function file_prevent_caching($path) {
+function file_prevent_caching($path) : void {
 	echo $path . '?v=' . base_convert(filemtime($path), 10, 35);
 }
 
@@ -10,9 +10,8 @@ function file_prevent_caching($path) {
     <meta charset="UTF-8">
     <title>Presenter</title>
 
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?php file_prevent_caching('style.css'); ?>" media="all">
-    <link rel="stylesheet" href="<?php file_prevent_caching('background.css'); ?>" media="all">
+    <link rel="stylesheet" href="<?php file_prevent_caching('css/style.css'); ?>" media="all">
+    <link rel="stylesheet" href="<?php file_prevent_caching('css/background.css'); ?>" media="all">
     <style>
         body:fullscreen.hide-mouse {
 			cursor: none;

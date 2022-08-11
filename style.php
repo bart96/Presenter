@@ -1,6 +1,6 @@
 <?php
 
-	$file = 'background.css';
+	$file = 'css/background.css';
 
 	if(isset($_POST['text'])) {
 		file_put_contents($file, $_POST['text']);
