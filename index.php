@@ -10,6 +10,8 @@
     <meta charset="UTF-8">
     <title>Presenter</title>
 
+	<script type="text/javascript" src="<?php file_prevent_caching('js/song.js'); ?>"></script>
+	<script type="text/javascript" src="<?php file_prevent_caching('js/utils.js'); ?>"></script>
     <script type="text/javascript" src="<?php file_prevent_caching('js/script.js'); ?>"></script>
     <link rel="stylesheet" href="<?php file_prevent_caching('css/style.css'); ?>" media="all">
     <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg">

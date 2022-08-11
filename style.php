@@ -9,8 +9,9 @@
 	}
 
 ?><!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+	<meta charset="UTF-8">
     <title>Style editor</title>
 
     <style>
@@ -22,19 +23,24 @@
             box-sizing: border-box;
         }
 
+		form {
+			position: fixed;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			display: flex;
+			flex-direction: column;
+		}
+
         textarea {
-            display: block;
+			flex-grow: 1;
             padding: 15px 25px;
-            width: 100%;
-			height: 650px;
-            resize: vertical;
-            border: 1px solid #F0F0F0;
+            resize: none;
         }
 
         button {
-            display: block;
             padding: 10px;
-			width: 100%;
             cursor: pointer;
             font-weight: bold;
         }
