@@ -2,7 +2,7 @@ class Song {
 	constructor(obj) {
 		obj = Object.assign({
 			title: SONG_UNKNOWN,
-			songNumber: - Date.now(),
+			songNumber: -Date.now(),
 			blocks: {},
 			initialOrder: [],
 			order: []
@@ -18,7 +18,7 @@ class Song {
 	}
 
 	toJSON() {
-		const obj = { ...this };
+		const obj = {... this};
 		delete obj.changeListener;
 		return obj;
 	}
@@ -104,9 +104,7 @@ class Song {
 
 	removeBlock(type) {
 		if(delete this.blocks[type]) {
-			let filter = e => {
-				return  e !== type;
-			}
+			let filter = e => e !== type;
 
 			this.initialOrder = this.initialOrder.filter(filter);
 			this.order = this.order.filter(filter);
@@ -147,12 +145,12 @@ class CCLISong extends Song {
 		song.account = parseInt(rows.pop().replace(/\D/g, ''));
 		do {
 			song.songNumber = rows.pop();
-		} while (!song.songNumber.startsWith('CCLI-'));
+		} while(!song.songNumber.startsWith('CCLI-'));
 
 		song.id = parseInt(song.songNumber.replace(/\D/g, ''));
 
 		rows.join('\n').split('\n\n\n').forEach(block => {
-			let row = block.split('\n').filter(e => { return e !== ''; });
+			let row = block.split('\n').filter(e => e !== '');
 			let type = row.shift();
 
 			if(song.initialOrder.includes(type)) {

@@ -47,4 +47,4 @@
 				'message' => 'successfully logged out'
 			]);
 		}
-	};
+	}

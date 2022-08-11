@@ -1269,7 +1269,7 @@ class GUI extends Loadable {
 
 			if(Object.keys(blocks).includes(name)) {
 				Notification.error(`Block "${name}" does already exist`);
-				return ;
+				return;
 			}
 
 			createBlock(name, [], true);
@@ -1432,7 +1432,7 @@ class GUI extends Loadable {
 	switchActive(e, ... actives) {
 		let collection = e.getElementsByClassName('active');
 
-		while (collection.length > 0) {
+		while(collection.length > 0) {
 			collection[0].classList.remove('active');
 		}
 

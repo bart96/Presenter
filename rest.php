@@ -37,7 +37,7 @@
 		if($restControllerClass == 'RestController') {
 			(new Response())->error(404, 'cannot call abstract RestController class');
 		}
-		else if(!class_exists($restControllerClass)) {
+		elseif(!class_exists($restControllerClass)) {
 			(new Response())->error(404, 'class ' . $restControllerClass . ' does not exist');
 		}
 		else {

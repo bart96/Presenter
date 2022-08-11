@@ -538,7 +538,7 @@ class DragNDrop {
 
 		let fileHandler = files => {
 			Array.from(files).forEach(file => {
-				if (filetypes.includes(file.type)) {
+				if(filetypes.includes(file.type)) {
 					$.loaded.forEach(fn => {
 						let reader = new FileReader();
 						reader.addEventListener('load', e => {
@@ -546,7 +546,8 @@ class DragNDrop {
 						});
 						reader.readAsText(file);
 					});
-				} else {
+				}
+				else {
 					$.errors.forEach(fn => {
 						fn(`Filetype "${file.type}" for file "${file.name}" not supported`);
 					});
