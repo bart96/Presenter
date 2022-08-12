@@ -43,11 +43,12 @@
 			cursor: pointer;
 			font-weight: bold;
 			font-size: 1.2em;
+			color: #FFF;
+			background: #C7F464;
 		}
 
 		button:hover,
 		button:focus {
-			color: #FFF;
 			background: #4ECDC4;
 		}
 	</style>

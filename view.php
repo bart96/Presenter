@@ -1,8 +1,8 @@
 <?php
 
-	function file_prevent_caching($path) : void {
-		echo $path . '?v=' . base_convert(filemtime($path), 10, 35);
-	}
+function file_prevent_caching($path) : void {
+	echo $path . '?v=' . base_convert(filemtime($path), 10, 35);
+}
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -67,6 +67,27 @@
 			if(window.fullScreen && document.body.classList.contains('hide-mouse')) {
 				e.preventDefault();
 				e.stopPropagation();
+			}
+		}
+
+		let resizeHandlerTimeout = false;
+		window.resizeHandler = null;
+		document.body.onresize = _ => {
+			if(window.resizeHandler) {
+				if(resizeHandlerTimeout !== false) {
+					clearTimeout(resizeHandlerTimeout);
+				}
+
+				resizeHandlerTimeout = setTimeout(_ => {
+					window.resizeHandler({
+						popupTop: window.screenY,
+						popupLeft: window.screenX,
+						popupWidth: window.innerWidth,
+						popupHeight: window.innerHeight
+					});
+
+					resizeHandlerTimeout = false;
+				}, 900);
 			}
 		}
 

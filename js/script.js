@@ -496,6 +496,12 @@ const PopUp = new class extends Loadable {
 
 			if(this.popup) {
 				this.popup.onload = _ => {
+					this.popup.resizeHandler = size => {
+						for(const [key, value] of Object.entries(size)) {
+							Config.set(key, value);
+						}
+					}
+
 					this.loadListener.forEach(fn => fn(this.send));
 				}
 			}
