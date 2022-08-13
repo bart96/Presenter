@@ -1,7 +1,15 @@
+const SONG_CUSTOM_NUMBER_LIMIT = 10000;
+const SONG_SEPARATOR = '---';
+const SONG_UNKNOWN_TITLE = 'UNKNOWN';
+const SONG_UNKNOWN_AUTHOR = 'UNKNOWN';
+const SONG_UNKNOWN_COPYRIGHT = '';
+
 class Song {
 	constructor(obj) {
 		obj = Object.assign({
-			title: SONG_UNKNOWN,
+			title: SONG_UNKNOWN_TITLE,
+			authors: SONG_UNKNOWN_AUTHOR,
+			copyright: SONG_UNKNOWN_COPYRIGHT,
 			songNumber: -Date.now(),
 			blocks: {},
 			initialOrder: [],
@@ -11,6 +19,8 @@ class Song {
 		this.changeListener = [];
 
 		this.title = obj.title;
+		this.authors = obj.authors;
+		this.copyright = obj.copyright;
 		this.songNumber = obj.songNumber;
 		this.blocks = obj.blocks;
 		this.initialOrder = obj.initialOrder;
@@ -27,9 +37,7 @@ class Song {
 		const old = this.songNumber;
 		this.songNumber = id;
 
-		this.changeListener.forEach(fn => {
-			fn('songId', this, old);
-		});
+		this.notify('songId', this, old);
 	}
 
 	get id() {
@@ -56,17 +64,41 @@ class Song {
 		return blocks;
 	}
 
-	get hasLicense() {
-		return false;
-	}
+	get info() {
+		const info = [];
 
-	get license() {
-		return '';
+		if(this.title === SONG_UNKNOWN_TITLE) {
+			info.push(`<strong>(#${this.id})</strong>`);
+		}
+		else {
+			info.push(`<strong>(#${this.id}) ${this.title}</strong>`);
+		}
+
+		if(this.authors !== SONG_UNKNOWN_AUTHOR) {
+			info.push(`${Config.get('Authors', 'Autoren')}: ${this.authors}`);
+		}
+
+		if(this.copyright !== SONG_UNKNOWN_COPYRIGHT) {
+			if(this.copyright.length > 300) {
+				info.push(`<small>${this.copyright}</small>`);
+			}
+			else {
+				info.push(this.copyright);
+			}
+		}
+
+		return info;
 	}
 
 	addSubscriber(fn) {
 		this.changeListener.push(fn);
 		return this;
+	}
+
+	notify(message, ... params) {
+		this.changeListener.forEach(fn => {
+			fn(message, ... params);
+		});
 	}
 
 	hasBlock(type) {
@@ -77,9 +109,21 @@ class Song {
 		let old = this.title;
 		this.title = title;
 
-		this.changeListener.forEach(fn => {
-			fn('songTitle', this, old);
-		});
+		this.notify('songTitle', this, old);
+	}
+
+	setAuthors(authors) {
+		let old = this.authors;
+		this.authors = authors;
+
+		this.notify('authors', this, old);
+	}
+
+	setCopyright(copyright) {
+		let old = this.copyright;
+		this.copyright = copyright;
+
+		this.notify('copyright', this, old);
 	}
 
 	setBlock(type, block) {
@@ -95,9 +139,7 @@ class Song {
 
 		this.blocks[type] = block;
 
-		this.changeListener.forEach(fn => {
-			fn('songBlockAdd', this, type);
-		});
+		this.notify('songBlockAdd', this, type);
 
 		return this;
 	}
@@ -109,9 +151,7 @@ class Song {
 			this.initialOrder = this.initialOrder.filter(filter);
 			this.order = this.order.filter(filter);
 
-			this.changeListener.forEach(fn => {
-				fn('songBlockRemove', this, type);
-			});
+			this.notify('songBlockRemove', this, type);
 		}
 
 		return this;
@@ -137,20 +177,53 @@ class Song {
 
 class CCLISong extends Song {
 	static parse(content) {
-		let song = new CCLISong();
-		let rows = content.trim().split('\r\n');
+		const song = new CCLISong();
+
+		const blocks = content.trim().split('\r\n\r\nCCLI-');
+		const text = blocks.shift();
+
+		if(blocks.length === 1) {
+			const info = blocks.shift();
+			const rows = info.trim().split('\r\n');
+
+			song.songNumber = parseInt(rows.shift().replace(/\D/g, ''));
+			song.authors = rows.shift().trim();
+			if(song.authors.toUpperCase() === SONG_UNKNOWN_AUTHOR) {
+				song.authors = SONG_UNKNOWN_AUTHOR;
+			}
+
+			song.account = parseInt(rows.pop().replace(/\D/g, ''));
+			const url = rows.pop().trim(); // url
+			if(url !== 'www.ccli.com') {
+				rows.push(url);
+			}
+
+			const licenseNotes = rows.pop().trim();
+			if(!licenseNotes.includes('SongSelect®')) {
+				rows.push(licenseNotes);
+			}
+
+			const copyright = [];
+			while(!rows[0].startsWith('© ')) {
+				rows.shift();
+			}
+			rows.forEach(row => {
+				row = row.trim();
+				if(row && !row.includes('Public Domain')) {
+					copyright.push(row);
+				}
+			});
+
+			song.copyright = copyright.join(' | ');
+		}
+
+		const rows = text.trim().split('\r\n');
 		let duplicates = 0;
 
 		song.title = rows.splice(0, 3).shift();
-		song.account = parseInt(rows.pop().replace(/\D/g, ''));
-		do {
-			song.songNumber = rows.pop();
-		} while(!song.songNumber.startsWith('CCLI-'));
-
-		song.id = parseInt(song.songNumber.replace(/\D/g, ''));
 
 		rows.join('\n').split('\n\n\n').forEach(block => {
-			let row = block.split('\n').filter(e => e !== '');
+			const row = block.split('\n').filter(e => e !== '');
 			let type = row.shift();
 
 			if(song.initialOrder.includes(type)) {
@@ -181,18 +254,23 @@ class CCLISong extends Song {
 		this.account = parseInt(obj.account);
 	}
 
-	get hasLicense() {
-		return this.id >= CUSTOM_NUMBER_LIMIT;
-	}
+	get info() {
+		let lines = super.info;
 
-	get license() {
-		return Config.get('CCLISongnumber', 'CCLI-Liednummer') + ` ${this.id}<br />`
-			+ Config.get('CCLILicensenumber', 'CCLI-Lizenznummer') + ` ${this.account}`;
+		if(this.id > SONG_CUSTOM_NUMBER_LIMIT) {
+			lines.push(`${Config.get('CCLILicensenumber', 'CCLI-Lizenznummer')}: ${this.account}`);
+		}
+
+		return lines;
 	}
 
 	exists() {
 		return new Promise((resolve, reject) => {
-			AJAX.get(`rest/SongExists/${this.id}`).then(({exists}) => {
+			AJAX.get(`rest/SongExists/${this.id}`).then(({exists, order}) => {
+				if(exists) {
+					this.order = order;
+				}
+
 				resolve({exists, song: this});
 			}).catch(reject);
 		});
@@ -203,8 +281,6 @@ class CCLISong extends Song {
 			let success = (song) => {
 				//const {account, songNumber, title, initialOrder, order, blocks} = song;
 				const {songNumber, title} = song;
-
-				console.log(song);
 
 				if(songNumber < 0 || isNaN(songNumber)) {
 					reject('could not update song number properly', song);

@@ -95,7 +95,7 @@ class Storage extends Storable {
 	addSong(song) {
 		this.data.order.push(song.id);
 
-		if(this.has(song)) {
+		if(!(song instanceof Song) && this.has(song)) {
 			song = this.data.songs[song.id];
 		}
 		else {
@@ -718,11 +718,18 @@ class GUI extends Loadable {
 		}).tooltip('Block screen popup');
 
 		PopUp.onLoad(send => {
-			PopUp.send('song', this.current.id);
 			PopUp.send('visibility', 'mouse', Config.get('hideMouse', true));
+			PopUp.send('visibility', 'text', this.elementPreview.classList.contains('hide-text'));
 
-			this.updateActiveBlock(); // ToDo get current active block
-			// ToDo check if text is blacked?
+			const song = this.elementPreview.getAttribute('song');
+			if(song) {
+				PopUp.send('song', song);
+			}
+
+			const active = this.lines.getActiveControl();
+			if(active && active.parentElement) {
+				PopUp.send('active', active.parentElement);
+			}
 
 		}).onChange((message, ... params) => {
 			switch(message) {
@@ -838,11 +845,6 @@ class GUI extends Loadable {
 		});
 
 		this.songToMove = null;
-		this.current = {
-			id: -1,
-			index: 1,
-			text: []
-		};
 
 		document.onkeydown = (e) => {
 			if(Modal.isActive) {
@@ -851,21 +853,13 @@ class GUI extends Loadable {
 
 			switch(e.code) {
 				case 'Home':
-					this.current.index = 0;
-					this.scrollTo(0);
-					this.updateActiveBlock();
+					this.lines.home();
 					break;
 				case 'ArrowUp':
-					if(this.current.index > 0) {
-						this.scrollTo(--this.current.index);
-						this.updateActiveBlock();
-					}
+					this.lines.prev();
 					break;
 				case 'ArrowDown':
-					if(this.current.index < this.elementPreview.children.length - 1) {
-						this.scrollTo(++this.current.index);
-						this.updateActiveBlock();
-					}
+					this.lines.next();
 					break;
 				case 'KeyB':
 					if(!e.ctrlKey) {
@@ -930,6 +924,129 @@ class GUI extends Loadable {
 
 			rootElement.attribute('theme', Config.get('theme', 'default|calibration|expert'));
 		});
+
+		this.lines = new class {
+			constructor(gui) {
+				this.gui = gui;
+				this.lines = [];
+
+				this.blockScrollDelay = window['chrome'] ? 200 : 0;
+			}
+
+			clear() {
+				this.lines = [];
+			}
+
+			get(lineNumber) {
+				return this.lines[lineNumber];
+			}
+
+			getActiveControl() {
+				return this.gui.elementControl.querySelector('p.active');
+			}
+
+			add(control, preview) {
+				const lineId = this.lines.length;
+
+				control.on(Config.get('verseClickBehaviour', 'dblclick'), e => {
+					e.preventDefault();
+					e.stopPropagation();
+
+					this.to(control, true);
+				});
+
+				this.lines.push({
+					control: control.attribute('line', lineId),
+					preview: preview.attribute('line', lineId)
+				});
+
+				return this;
+			}
+
+			home(preventSmoothScroll) {
+				this.to(0, preventSmoothScroll);
+
+				return this;
+			}
+
+			next(preventSmoothScroll) {
+				const active = this.getActiveControl();
+				if(active) {
+					let lineId = parseInt(active.getAttribute('line'));
+					if(++lineId < this.lines.length) {
+						this.to(lineId, preventSmoothScroll);
+					}
+				}
+				else {
+					this.to(0, true);
+				}
+
+				return this;
+			}
+
+			prev(preventSmoothScroll) {
+				const active = this.getActiveControl();
+				if(active) {
+					let lineId = parseInt(active.getAttribute('line'));
+					if(--lineId >= 0) {
+						this.to(lineId, preventSmoothScroll);
+					}
+				}
+				else {
+					this.to(0, !Config.get('doubleClickSmoothScrollBehaviour', false));
+				}
+
+				return this;
+			}
+
+			to(lineNumberOrControlElement, preventSmoothScroll) {
+				let lineId, controlElement;
+
+				if(typeof lineNumberOrControlElement === 'number') {
+					lineId = lineNumberOrControlElement;
+					controlElement = this.lines[lineId].control;
+				}
+				else {
+					controlElement = lineNumberOrControlElement;
+					lineId = parseInt(controlElement.getAttribute('line'));
+				}
+
+				const offset = this.lines.length - lineId === 2 ? 1 : 0
+				let previewId = lineId - offset;
+				if(previewId < 0) {
+					previewId = 0;
+				}
+				let previewElement = this.lines[previewId].preview;
+
+				const block = controlElement.parentElement;
+
+				if(preventSmoothScroll) {
+					this.gui.elementPreview.style('scroll-behavior', 'auto');
+					setTimeout(_ => {
+						this.gui.elementPreview.style('scroll-behavior', '');
+					}, 100);
+				}
+				previewElement.scrollIntoView();
+
+				if(!block.classList.contains('active')) {
+					Array.from(this.gui.elementControl.querySelectorAll('span.active')).forEach(active => active.classList.remove('active'));
+
+					block.classList.add('active');
+					setTimeout(_ => {
+						block.scrollIntoView();
+					}, this.blockScrollDelay);
+
+					if(!PopUp.inactive) {
+						PopUp.send('active', block);
+					}
+				}
+
+				Array.from(this.gui.elementControl.querySelectorAll('p.active')).forEach(active => active.classList.remove('active'));
+				controlElement.classList.add('active');
+
+				return this;
+			}
+		}(this);
 	}
 
 	addSubscriber(fn) {
@@ -1072,67 +1189,34 @@ class GUI extends Loadable {
 		return song;
 	}
 
-	updateActiveBlock() {
-		if(!PopUp.inactive) {
-			const active = this.elementControl.querySelector('span.active');
-
-			if(active) {
-				PopUp.send('active', active);
-			}
-		}
-
-		return this;
-	}
-
 	addLine(block, line, className) {
 		if(!line) {
 			line = '<br />';
 		}
 
-		let controlLine = new element('p').parent(block).html(line).listener(Config.get('verseClickBehaviour', 'dblclick'), e => {
-			e.preventDefault();
-			e.stopPropagation();
-
-			let lines = Array.from(this.elementControl.getElementsByTagName('p'));
-			this.current.index = lines.indexOf(controlLine.element);
-
-			this.scrollTo(this.current.index, {
-				scrollToBlock: false,
-				scrollBehavior: Config.get('verseScrollBehaviour', 'auto')
-			});
-
-			this.updateActiveBlock();
-		});
-
-		if(this.current.text.length < 1) {
-			controlLine.class('active');
-		}
-
+		let controlLine = new element('p').parent(block).html(line);
 		let previewLine = new element('p').html(line);
 		this.elementPreview.appendChild(previewLine);
-		this.current.text.push(previewLine);
-
-		if(previewLine.scrollWidth > this.elementPreview.offsetWidth) {
-			controlLine.class('overflow');
-			this.overflowWarning.parent(this.overlay);
-		}
 
 		if(className) {
 			controlLine.class(className);
 			previewLine.class(className);
 		}
 
+		this.lines.add(controlLine, previewLine);
+
 		return previewLine;
 	}
 
 	showSong(song, li) {
-		this.current.id = song.id;
-		this.current.index = 0;
-		this.current.text = [];
-
+		this.lines.clear();
 		this.overflowWarning.remove();
 		this.elementControl.clear();
 		this.elementPreview.clear();
+
+		this.elementPreview.attribute('song', song.id);
+		PopUp.send('song', song.id);
+
 		this.switchActive(this.elementSongs, li);
 
 		if(Config.get('resetBlackOnSongSwitch', false)) {
@@ -1157,19 +1241,11 @@ class GUI extends Loadable {
 				});
 
 				let header = new element('h1').text(order).parent(block).listener('click', _ => {
-					let index = Array.from(this.elementControl.getElementsByTagName('p')).indexOf(block.querySelector('p'));
-					this.current.index = index;
-					this.scrollTo(index, {
-						scrollBehavior: Config.get('navScrollBehaviour', 'auto')
-					});
-
-					this.updateActiveBlock();
+					if(header.nextElementSibling) {
+						this.lines.to(header.nextElementSibling, !Config.get('headlineSmoothScrollBehaviour', false));
+					}
 				});
 				block.data('nav', header);
-
-				if(this.current.text.length < 1) {
-					block.class('active');
-				}
 
 				return block;
 			}
@@ -1186,30 +1262,33 @@ class GUI extends Loadable {
 			});
 		});
 
-		if(song.hasLicense) {
-			block = new element('span').class('copyright').parent(this.elementControl);
-			new element('h1').html('©<em>Copyright</em>').parent(block);
-			this.addLine(block, song.license).class('copyright');
-		}
-		else {
-			this.addLine(block, '', 'fill');
-		}
+		block = new element('span').class('copyright').parent(this.elementControl);
+		new element('h1').html('©<em>Copyright</em>').parent(block);
+		this.addLine(block, song.info.join('<br />')).class('copyright');
 
-		this.elementControl.firstElementChild.scrollIntoView();
+		this.lines.home(true);
 
-		PopUp.send('song', song.id);
-		this.updateActiveBlock();
+		setTimeout(_ => {
+			Array.from(this.elementPreview.getElementsByTagName('p')).forEach(line => {
+				if(line.scrollWidth > this.elementPreview.offsetWidth) {
+					this.lines.get(line.getAttribute('line')).control.class('overflow');
+					this.overflowWarning.parent(this.overlay);
+				}
+			});
+		}, 1500);
 	}
 
 	editSong(song, li) {
-		let $ = this;
-		let wrapper = new element('div').class('song');
-		let blocks = {};
+		const $ = this;
+		const wrapper = new element('div').class('song');
+		const blocks = {};
 		let currentBlock = null;
-		let title = new element('input');
-		let editBlock = new element('textarea');
-		let editOrder = new element('ul');
-		let options = new element('li');
+		const title = new element('input');
+		const authors = new element('input');
+		const copyright = new element('input');
+		const editBlock = new element('textarea');
+		const editOrder = new element('ul');
+		const options = new element('li');
 
 		function editBlockHandler() {
 			blocks[currentBlock] = editBlock.value();
@@ -1282,16 +1361,39 @@ class GUI extends Loadable {
 		});
 		new element('button').type('button').class('delete').parent(options).on('click', _ => {
 			wrapper.classList.toggle('remove');
-		})
+		});
 
-		title.type('text').class('title').value(song.title).placeholder('Title').parent(wrapper);
+		const info = new element('div').class('info', 'title').parent(wrapper);
+
+		title.type('text').class('title').value(song.title).placeholder('Title').parent(info);
+		authors.type('text').class('authors').value(song.authors).placeholder('Authors').parent(info);
+		copyright.type('text').class('copyright').value(song.copyright).placeholder('Copyright').parent(info);
+
+		new element('button').type('text').class('title').text('Title').parent(info).on('click', _ => {
+			info.classList.remove('authors', 'copyright');
+			info.class('title');
+		});
+		new element('button').type('text').class('authors').text('Authors').parent(info).on('click', _ => {
+			info.classList.remove('title', 'copyright');
+			info.class('authors');
+		}).on('contextmenu', _ => {
+			authors.value(SONG_UNKNOWN_AUTHOR);
+		});
+		new element('button').type('text').class('copyright').text('©').parent(info).on('click', _ => {
+			info.classList.remove('title', 'authors');
+			info.class('copyright');
+		}).on('dblclick', _ => {
+			copyright.value(`© ${copyright.value()}`);
+		}).on('contextmenu', _ => {
+			copyright.value(SONG_UNKNOWN_COPYRIGHT);
+			copyright.focus();
+		});
 
 		editBlock.parent(wrapper).on('blur', editBlockHandler);
 		editOrder.class('order');
 
 		function add(index) {
 			let li = new element('li').on('click', _ => {
-				console.log(currentBlock);
 				add(li.index);
 				order(currentBlock, li.index);
 			});
@@ -1331,6 +1433,8 @@ class GUI extends Loadable {
 			}
 
 			song.setTitle(title.value());
+			song.setAuthors(authors.value());
+			song.setCopyright(copyright.value());
 
 			let newOrder = [];
 
@@ -1392,7 +1496,6 @@ class GUI extends Loadable {
 	showConfig() {
 		let table = new element('table').class('config');
 
-		// ToDo there is a bug in here	script.js:1799:30	Uncaught TypeError: (new element(...)).text(...).parent is not a function
 		Config.forEach((v, k) => {
 			let tr = new element('tr').parent(table).on('contextmenu', _ => {
 				let td = tr.querySelector('td');
@@ -1436,47 +1539,20 @@ class GUI extends Loadable {
 	}
 
 	switchActive(e, ... actives) {
-		let collection = e.getElementsByClassName('active');
-
-		while(collection.length > 0) {
-			collection[0].classList.remove('active');
-		}
+		Array.from(e.getElementsByClassName('active')).forEach(active => {
+			active.classList.remove('active');
+		});
 
 		actives.forEach(active => {
 			active.classList.add('active');
 		});
 	}
+}
 
-	scrollTo(lineNumber, options) {
-		options = Object.assign({
-			scrollToBlock: true,
-			scrollBehavior: 'smooth'
-		}, options || {});
-
-		let offset = 1;
-		let scrollOptions = {
-			behavior: options.scrollBehavior,
-			block: 'end'
-		}
-
-		if(lineNumber > this.elementPreview.children.length - 3) {
-			offset = 0;
-		}
-		if(!Config.get('scrollAnimation', true) || window['chrome']) {
-			scrollOptions.behavior = 'auto';
-		}
-
-		this.elementPreview.children[lineNumber + offset].scrollIntoView(scrollOptions);
-
-		let p = this.elementControl.getElementsByTagName('p')[lineNumber];
-		if(options.scrollToBlock && p.parentElement.nextElementSibling) {
-			p.parentElement.nextElementSibling.scrollIntoView(scrollOptions);
-		}
-
-		if(!p.classList.contains('fill')) {
-			this.switchActive(this.elementControl, p.parentElement, p);
-		}
-	}
+window.onerror = function(message, source, lineno, colno) {
+	AJAX.post('rest/Log', {
+		message: `${source}[${lineno}:${colno}] - ${message}`
+	}).catch(e => console.error(e));
 }
 
 window.onbeforeunload = e => {

@@ -21,17 +21,12 @@
 <main></main>
 
 <script>
-	(function(e) {
+	(e => {
 		let storage = new Storage();
 		let gui = new GUI(e);
 
 		storage.addSubscriber(gui.changeHandler);
 		gui.addSubscriber(storage.changeHandler);
-
-		/*
-		storage.addSubscriber(() => gui.changeHandler(... arguments));
-		gui.addSubscriber(() => storage.changeHandler(... arguments));
-        */
 
 		new DragNDrop(e, ['text/plain'], 'over', element.from('#songs')).onFileLoaded(text => {
 			CCLISong.parse(text).exists().then(({exists, song}) => {

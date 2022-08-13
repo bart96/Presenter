@@ -10,14 +10,15 @@
 			$account = $req->account;
 
 			$stmt = self::prepare('
-				SELECT COUNT(*) AS occurrences
+				SELECT COUNT(*) AS occurrences, `order`
 				FROM `songs`
 				where `account` = ? AND `songnumber` = ?
 			');
 
-			$stmt->bind_param('ii', $account, $songNumber)->execute()->fetchOne($count)->close();
+			$stmt->bind_param('ii', $account, $songNumber)->execute()->fetchOne($song)->close();
 			$result = [
-				'exists' => $count['occurrences'] > 0
+				'exists' => $song['occurrences'] > 0,
+				'order' => $song['order']
 			];
 
 			$res->success($result);

@@ -7,6 +7,9 @@
 		const SEPARATOR_BLOCK = ' # ';
 		const SEPARATOR_BLOCK_ESCAPE = '{#}';
 
+		const UNKNOWN_AUTHOR = 'UNKNOWN'; /* update UNKNOWN_AUTHOR in js/song.js as well */
+		const UNKNOWN_COPYRIGHT = ''; /* update UNKNOWN_COPYRIGHT in js/song.js as well */
+
 		protected function get(Request &$req, Response &$res) : never {
 			$req->path->checkNumeric(0);
 
@@ -19,20 +22,22 @@
 			];
 
 			$stmt = self::prepare('
-				SELECT `title`, `initialOrder`, `order`
+				SELECT `title`, `initialOrder`, `order`, `authors`, `copyright`
 				FROM `songs`
 				WHERE `songnumber` = ?
 				AND `account` = ?
 			');
 
 			$stmt->bind_param('ii', $songNumber, $account)->execute();
-			$stmt->bind_result($title, $initialOrder, $order);
+			$stmt->bind_result($title, $initialOrder, $order, $authors, $copyright);
 
 			if($stmt->fetch()) {
 				$result['title'] = $title;
 				$result['initialOrder'] = explode(self::SEPARATOR_ORDER, $initialOrder);
 				$result['order'] = explode(self::SEPARATOR_ORDER, $order);
 				$result['blocks'] = [];
+				$result['authors'] = $authors;
+				$result['copyright'] = $copyright;
 
 				$stmt->close();
 
@@ -74,6 +79,8 @@
 			$initialOrder = $req->params->getAsArray('initialOrder');
 			$order = $req->params->getAsArray('order', $initialOrder);
 			$blocks = $req->params->getAsObject('blocks');
+			$authors = $req->params->get('authors', self::UNKNOWN_AUTHOR);
+			$copyright = $req->params->get('copyright', self::UNKNOWN_COPYRIGHT);
 
 			if($songNumber === NULL || $songNumber < 0) {
 				$songNumber = $this->generateSongNumber($account);
@@ -81,19 +88,21 @@
 
 			$stmt = self::prepare('
 				INSERT INTO `songs` (
-					`account`, `songnumber`, `title`, `initialOrder`, `order`
+					`account`, `songnumber`, `title`, `initialOrder`, `order`, `authors`, `copyright`
 				) VALUES (
-					?, ?, ?, ?, ?
+					?, ?, ?, ?, ?, ?, ?
 				)
 			');
 
 			$stmt->bind_param(
-				'iisss',
+				'iisssss',
 				$account,
 				$songNumber,
 				$title,
 				join(self::SEPARATOR_ORDER, $initialOrder),
-				join(self::SEPARATOR_ORDER, $order)
+				join(self::SEPARATOR_ORDER, $order),
+				$authors,
+				$copyright
 			)->execute()->close();
 
 			$this->insertBlocks($account, $songNumber, $blocks);
@@ -104,7 +113,9 @@
 				'title' => $title,
 				'initialOrder' => $initialOrder,
 				'order' => $order,
-				'blocks' => $blocks
+				'blocks' => $blocks,
+				'authors' => $authors,
+				'copyright' => $copyright
 			]);
 		}
 
@@ -117,21 +128,43 @@
 			$initialOrder = $req->params->getAsArray('initialOrder');
 			$order = $req->params->getAsArray('order');
 			$blocks = $req->params->getAsObject('blocks');
+			$authors = $req->params->get('authors', self::UNKNOWN_AUTHOR);
+			$copyright = $req->params->get('copyright', self::UNKNOWN_COPYRIGHT);
 
 			$stmt = self::prepare('
 				UPDATE `songs`
-				SET `title` = ?,
-				    `initialOrder` = ?,
-				    `order` = ?
+				SET `authors` = ?,
+				    `copyright` = ?
 				WHERE `songnumber` = ?
 				AND `account` = ?
 			');
 
 			$stmt->bind_param(
-				'sssii',
+				'ssii',
+				$authors,
+				$copyright,
+				$songNumber,
+				$account
+			)->execute()->close();
+
+			$stmt = self::prepare('
+				UPDATE `songs`
+				SET `title` = ?,
+				    `initialOrder` = ?,
+				    `order` = ?,
+				    `authors` = ?,
+				    `copyright` = ?
+				WHERE `songnumber` = ?
+				AND `account` = ?
+			');
+
+			$stmt->bind_param(
+				'sssssii',
 				$title,
 				join(self::SEPARATOR_ORDER, $initialOrder),
 				join(self::SEPARATOR_ORDER, $order),
+				$authors,
+				$copyright,
 				$songNumber,
 				$account
 			)->execute()->close();
@@ -144,7 +177,9 @@
 				'title' => $title,
 				'initialOrder' => $initialOrder,
 				'order' => $order,
-				'blocks' => $blocks
+				'blocks' => $blocks,
+				'authors' => $authors,
+				'copyright' => $copyright
 			]);
 		}
 
@@ -156,6 +191,14 @@
 
 			$stmt = self::prepare('
 				DELETE FROM `songs`
+				WHERE `songnumber` = ?
+				AND `account` = ?
+			');
+
+			$stmt->bind_param('ii', $songNumber, $account)->execute()->close();
+
+			$stmt = self::prepare('
+				DELETE FROM `blocks`
 				WHERE `songnumber` = ?
 				AND `account` = ?
 			');

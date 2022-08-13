@@ -32,6 +32,9 @@ class element {
 		return e ? new element(e) : e;
 	}
 
+	/**
+	 * @returns DOMTokenList
+	 */
 	get classList() {
 		return this.element.classList;
 	}
@@ -194,6 +197,10 @@ class element {
 		return this;
 	}
 
+	getAttribute(attribute) {
+		return this.element.getAttribute(attribute);
+	}
+
 	text(text) {
 		if(text === undefined) {
 			return this.element.textContent;
@@ -265,16 +272,17 @@ class element {
 		return this;
 	}
 
-	scrollTo() {
-		this.element.scrollIntoView({
-			behavior: 'smooth',
-			block: 'end'
-		});
+	scrollIntoView(options) {
+		this.element.scrollIntoView(options);
 		return this;
 	}
 
 	querySelector(selector) {
 		return this.element.querySelector(selector);
+	}
+
+	querySelectorAll(selector) {
+		return this.element.querySelectorAll(selector);
 	}
 
 	before(el) {

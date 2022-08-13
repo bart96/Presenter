@@ -75,6 +75,12 @@
 					break;
 			}
 		});
+
+		window.onerror = function(message, source, lineno, colno) {
+			AJAX.post('rest/Log', {
+				message: `${source}[${lineno}:${colno}] - ${message}`
+			}).catch(e => console.error(e));
+		}
 	</script>
 </body>
 </html>
