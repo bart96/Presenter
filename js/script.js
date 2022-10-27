@@ -444,11 +444,9 @@ const Config = new class extends Storable {
 	}
 
 	forEach(fn) {
-		for(let i in this.data) {
-			if(this.data.hasOwnProperty(i)) {
-				fn(this.data[i], i, this.data);
-			}
-		}
+		Object.keys(this.data).sort(Intl.Collator().compare).forEach(key => {
+			fn(this.data[key], key, this.data);
+		});
 	}
 
 	load() {
@@ -457,7 +455,7 @@ const Config = new class extends Storable {
 		if(Config.get('hideMouse', true)) {
 			document.body.classList.add('hide-mouse');
 		}
-		if(Config.get('hidePreview', false)) {
+		if(Config.get('hidePreview', true)) {
 			document.body.classList.add('hide-preview');
 		}
 	}
@@ -1231,6 +1229,12 @@ class GUI extends Loadable {
 			previewLine.class(className);
 		}
 
+		if(Config.get('hidePreview', true)) {
+			controlLine.listener('click', _ => {
+				this.lines.to(controlLine, !Config.get('headlineSmoothScrollBehaviour', false));
+			});
+		}
+
 		this.lines.add(controlLine, previewLine);
 
 		return previewLine;
@@ -1291,8 +1295,17 @@ class GUI extends Loadable {
 		});
 
 		block = new element('span').class('copyright').parent(this.elementControl);
-		new element('h1').html('©<em>Copyright</em>').parent(block);
+		let header = new element('h1').html('©<em>Copyright</em>').parent(block);
 		this.addLine(block, song.info.join('<br />')).class('copyright');
+
+		if(Config.get('hidePreview', true)) {
+			header.listener('click', _ => {
+				if(header.nextElementSibling) {
+					this.lines.to(header.nextElementSibling, !Config.get('headlineSmoothScrollBehaviour', false));
+				}
+			});
+		}
+
 
 		this.lines.home(true);
 
