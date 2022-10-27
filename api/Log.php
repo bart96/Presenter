@@ -10,7 +10,11 @@
 		}
 
 		public static function read() : string {
-			return file_get_contents(self::$filename);
+			if(file_exists(self::$filename)) {
+				return file_get_contents(self::$filename);
+			}
+
+			return '';
 		}
 
 		protected function get(Request &$req, Response &$res) : never {

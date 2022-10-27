@@ -1,7 +1,8 @@
+/*
 
-const SONG_UNKNOWN = 'UNKNOWN';
-const CUSTOM_NUMBER_LIMIT = 10000;
-const SONG_SEPARATOR = '---';
+	ToDo look after search e.g. #1 Bei dir is not found
+
+ */
 
 class Storage extends Storable {
 	constructor() {
@@ -258,7 +259,7 @@ const Modal = new class {
 
 	width(width) {
 		if(width.endsWith('px') && parseInt(width.slice(0, -2)) > window.innerWidth) {
-			width = window.innerWidth + 'px';
+			width = `${window.innerWidth}px`;
 		}
 
 		this.container.width(width);
@@ -267,7 +268,7 @@ const Modal = new class {
 
 	height(height) {
 		if(height.endsWith('px') && parseInt(height.slice(0, -2)) > window.innerHeight) {
-			height = window.innerHeight + 'px';
+			height = `${window.innerHeight}px`;
 		}
 
 		this.content.height(height);
@@ -629,7 +630,7 @@ class GUI extends Loadable {
 				let d = new Date();
 				let format = Config.get('ShowSaveFormat', 'Show {dd}.{MM}.{yyyy}');
 
-				function z(n) {
+				const z = n => {
 					return (n < 10) ? `0${n}` : `${n}`;
 				}
 
@@ -656,26 +657,38 @@ class GUI extends Loadable {
 				Notification.success('Copied CCLI list to clipboard');
 			}).child(copy);
 
-			function loadShows($) {
+			const loadShows = _ => {
 				AJAX.get(`rest/Shows/${Config.get('showLimit', 30)}`).then(shows => {
 					wrapper.clear();
 
 					shows.forEach(show => {
 						let li = new element('li').text(show.title).parent(wrapper).on('dblclick', _ => {
-							$.notifySubscriber('downloadShow', show);
+							this.notifySubscriber('downloadShow', show);
 							Modal.close();
 						});
 
-						new element('button').type('button').class('upload').tooltip('upload').parent(li).on('click', _ => {
+						new element('button').type('button').class('upload').tooltip('upload current songs to server').parent(li).on('click', _ => {
 							if(!Config.get('confirmShowOverwrite', true) || confirm('Overwrite show?')) {
-								$.notifySubscriber('uploadShow', show);
-								loadShows($);
+								this.notifySubscriber('uploadShow', show);
+								loadShows();
 							}
+						});
+
+						new element('button').type('button').class('setList').tooltip('CCLI reporting').parent(li).on('click', _ => {
+							let ccliNumbers = [];
+
+							show.order.forEach(songNumber => {
+								if(songNumber > SONG_CUSTOM_NUMBER_LIMIT) {
+									ccliNumbers.push(songNumber);
+								}
+							});
+
+							window.open(`https://reporting.ccli.com/search?s=${ccliNumbers.join('%7C')}`, '_blank');
 						});
 
 						new element('button').type('button').text('×').tooltip('delete').parent(li).on('click', _ => {
 							if(!Config.get('confirmShowDeletion', true) || confirm('Delete show?')) {
-								$.notifySubscriber('deleteShow', show);
+								this.notifySubscriber('deleteShow', show);
 								li.remove();
 							}
 						});
@@ -1002,8 +1015,20 @@ class GUI extends Loadable {
 			to(lineNumberOrControlElement, preventSmoothScroll) {
 				let lineId, controlElement;
 
+				if(this.lines.length < 1) {
+					return this;
+				}
+
 				if(typeof lineNumberOrControlElement === 'number') {
 					lineId = lineNumberOrControlElement;
+
+					if(lineId < 0) {
+						lineId = 0;
+					}
+					else if(lineId >= this.lines.length) {
+						lineId = this.lines.length - 1;
+					}
+
 					controlElement = this.lines[lineId].control;
 				}
 				else {
@@ -1118,7 +1143,7 @@ class GUI extends Loadable {
 			})
 			.on('mouseenter', _ => {
 				this.expand.text(song.title);
-				this.expand.style('top', li.rect.top + 'px');
+				this.expand.style('top', `${li.rect.top}px`);
 				this.expand.className('visible');
 
 				if(li.classList.contains('active')) {
@@ -1279,7 +1304,6 @@ class GUI extends Loadable {
 	}
 
 	editSong(song, li) {
-		const $ = this;
 		const wrapper = new element('div').class('song');
 		const blocks = {};
 		let currentBlock = null;
@@ -1290,11 +1314,11 @@ class GUI extends Loadable {
 		const editOrder = new element('ul');
 		const options = new element('li');
 
-		function editBlockHandler() {
+		const editBlockHandler = _ => {
 			blocks[currentBlock] = editBlock.value();
 		}
 
-		function createBlock(type, block, active) {
+		const createBlock = (type, block, active) => {
 			if(block) {
 				if(Array.isArray(block)) {
 					block = block.join('\n');
@@ -1310,7 +1334,7 @@ class GUI extends Loadable {
 				currentBlock = type;
 				editBlock.value(blocks[type]);
 
-				$.switchActive(ul, li);
+				this.switchActive(ul, li);
 			});
 			new element('span').text(type).parent(li);
 
@@ -1321,7 +1345,7 @@ class GUI extends Loadable {
 				}
 
 				let active = li.previousElementSibling;
-				$.switchActive(ul, active);
+				this.switchActive(ul, active);
 
 				li.remove();
 
@@ -1339,7 +1363,7 @@ class GUI extends Loadable {
 				currentBlock = type;
 				editBlock.value(blocks[type]);
 
-				$.switchActive(ul, li);
+				this.switchActive(ul, li);
 			}
 		}
 
@@ -1392,7 +1416,7 @@ class GUI extends Loadable {
 		editBlock.parent(wrapper).on('blur', editBlockHandler);
 		editOrder.class('order');
 
-		function add(index) {
+		const add = index => {
 			let li = new element('li').on('click', _ => {
 				add(li.index);
 				order(currentBlock, li.index);
@@ -1402,7 +1426,7 @@ class GUI extends Loadable {
 			editOrder.appendChild(li, index);
 		}
 
-		function order(text, index) {
+		const order = (text, index) => {
 			let li = new element('li');
 			new element('span').text(text).parent(li);
 			new element('button').class('close').parent(li).on('click', _ => {

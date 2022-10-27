@@ -7,17 +7,22 @@
 
 		private static function initMysqli() : void {
 			if(!self::$db) {
-				require_once(__DIR__ . '/../config.php');
+				try {
+					require_once(__DIR__ . '/../config.php');
 
-				self::$db = @new mysqli(
-					DB_HOST,
-					DB_USER,
-					DB_PASSWORD,
-					DB_DATABASE
-				);
+					self::$db = new mysqli(
+						DB_HOST,
+						DB_USER,
+						DB_PASSWORD,
+						DB_DATABASE
+					);
 
-				if(self::$db->connect_errno) {
-					throw new Error('could not establish connection to database "' . DB_HOST . '" (' . self::$db->connect_errno . ')');
+					if(self::$db->connect_errno) {
+						throw new Exception(self::$db->connect_errno);
+					}
+				}
+				catch(Exception $e) {
+					throw new Error('could not establish connection to database "' . DB_HOST . '" (' . $e->getMessage() . ')');
 				}
 
 				if(!self::$db->set_charset("utf8")) {
