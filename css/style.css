@@ -103,6 +103,18 @@ body.hide-mouse main {
 	cursor: none;
 }
 
+body.hide-preview main #songs {
+	grid-row: 2 / span 2;
+}
+
+body.hide-preview main #control {
+	grid-row: 1 / span 3;
+}
+
+body.hide-preview main #preview {
+	display: none;
+}
+
 .shrunk main {
 	grid-template-columns: 60px auto;
 }

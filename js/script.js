@@ -457,6 +457,9 @@ const Config = new class extends Storable {
 		if(Config.get('hideMouse', true)) {
 			document.body.classList.add('hide-mouse');
 		}
+		if(Config.get('hidePreview', false)) {
+			document.body.classList.add('hide-preview');
+		}
 	}
 }
 
