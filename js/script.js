@@ -864,10 +864,33 @@ class GUI extends Loadable {
 					this.lines.home();
 					break;
 				case 'ArrowUp':
-					this.lines.prev();
+					if(Config.get('useArrowsForMovingBetweenLines', true)) {
+						this.lines.prev();
+					}
 					break;
 				case 'ArrowDown':
-					this.lines.next();
+					if(Config.get('useArrowsForMovingBetweenLines', true)) {
+						this.lines.next();
+					}
+					break;
+				case 'ArrowLeft':
+				case 'ArrowRight':
+					if(!Config.get('useArrowsForMovingBetweenBlocks', true)) {
+						return;
+					}
+
+					const active = this.elementControl.querySelector('span.active');
+					if(active) {
+						const element = e.code === 'ArrowLeft' ? active.previousElementSibling : active.nextElementSibling;
+
+						if(element) {
+							const p = element.querySelector('p');
+
+							if(p) {
+								this.lines.to(p, !Config.get('headlineSmoothScrollBehaviour', false));
+							}
+						}
+					}
 					break;
 				case 'KeyB':
 					if(!e.ctrlKey) {
@@ -917,7 +940,7 @@ class GUI extends Loadable {
 				window.resizeTo(screen.availWidth, screen.availHeight);
 			});
 			const checkMaximized = _ => {
-				if(screen.availWidth - window.innerWidth === 0) {
+				if(Config.get('hidePreview', true) || screen.availWidth - window.innerWidth === 0) {
 					notMaximizedWarning.remove();
 				}
 				else {
@@ -1539,7 +1562,7 @@ class GUI extends Loadable {
 				.attribute('key', k)
 		});
 
-		Modal.show('Configuration', table).width('520px').resizable('173px').onApply(_ => {
+		Modal.show('Configuration', table).width('600px').resizable('290px').onApply(_ => {
 			Array.from(table.getElementsByTagName('td')).forEach(td => {
 				let key = td.getAttribute('key');
 
