@@ -1,9 +1,3 @@
-/*
-
-	ToDo look after search e.g. #1 Bei dir is not found
-
- */
-
 class Storage extends Storable {
 	constructor() {
 		super('data', {
@@ -936,7 +930,7 @@ class GUI extends Loadable {
 			checkMaximized();
 			document.body.onresize = checkMaximized;
 
-			rootElement.attribute('theme', Config.get('theme', 'default|calibration|expert'));
+			rootElement.attribute('theme', Config.get('theme', 'default|calibration|boxed'));
 		});
 
 		this.lines = new class {
@@ -1229,12 +1223,6 @@ class GUI extends Loadable {
 			previewLine.class(className);
 		}
 
-		if(Config.get('hidePreview', true)) {
-			controlLine.listener('click', _ => {
-				this.lines.to(controlLine, !Config.get('headlineSmoothScrollBehaviour', false));
-			});
-		}
-
 		this.lines.add(controlLine, previewLine);
 
 		return previewLine;
@@ -1305,7 +1293,6 @@ class GUI extends Loadable {
 				}
 			});
 		}
-
 
 		this.lines.home(true);
 

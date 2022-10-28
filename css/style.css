@@ -115,6 +115,14 @@ body.hide-preview main #preview {
 	display: none;
 }
 
+body.hide-preview .modal .container .content {
+	max-height: 750px;
+}
+
+body.hide-preview .modal .container .song textarea {
+	max-height: 450px;
+}
+
 .shrunk main {
 	grid-template-columns: 60px auto;
 }
@@ -354,36 +362,37 @@ main #control span p.overflow::before {
 	color: var(--bright);
 }
 
-main[theme="expert"] #control {
+main[theme="boxed"] #control {
 	display: flex;
 	flex-wrap: wrap;
 	flex-direction: column;
-	padding: 39px 0;
 }
 
-main[theme="expert"] #control .wrapper {
+main[theme="boxed"] #control .wrapper {
 	display: flex;
 	flex-wrap: wrap;
 	flex-direction: row;
 	justify-content: center;
-	gap: 10px;
+	gap: 20px 10px;
+	padding: 10px 15px;
 }
 
-main[theme="expert"] #control span {
+main[theme="boxed"] #control span {
+	flex-grow: 1;
 	padding: 0 0 10px;
 	border: 1px solid;
 	border-color: var(--primary);
 }
 
-main[theme="expert"] #control span.active {
+main[theme="boxed"] #control span.active {
 	border-color: var(--secondary);
 }
 
-main[theme="expert"] #control span.active h1 {
+main[theme="boxed"] #control span.active h1 {
 	background: var(--secondary);
 }
 
-main[theme="expert"] #control span h1 {
+main[theme="boxed"] #control span h1 {
 	position: static;
 	margin-bottom: 10px;
 	padding: 8px 0;
@@ -391,11 +400,11 @@ main[theme="expert"] #control span h1 {
 	background: var(--primary);
 }
 
-main[theme="expert"] #control span h1 em {
+main[theme="boxed"] #control span h1 em {
 	display: inline;
 }
 
-main[theme="expert"] #control span p {
+main[theme="boxed"] #control span p {
 	margin: 0;
 }
 
