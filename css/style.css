@@ -25,6 +25,7 @@
 	--secondary: #4ECDC4;
 	--tertiary: #C7F464;
 	--bright: #FFF;
+	--grey: #666;
 	--dark: #000;
 	--dark-highlight: #353535;
 }
@@ -121,6 +122,10 @@ body.hide-preview .modal .container .content {
 
 body.hide-preview .modal .container .song textarea {
 	max-height: 450px;
+}
+
+body.hideTranslation p.translation {
+	display: none;
 }
 
 .shrunk main {
@@ -348,6 +353,14 @@ main #control span p {
 
 main #control span p:hover {
 	background: var(--primary);
+}
+
+main #control span p.translation {
+	color: var(--grey);
+}
+
+main #control span p.translation::before {
+	content: '[' attr(language) '] ';
 }
 
 main #control span p.active {
@@ -607,6 +620,17 @@ main #preview.hide-text,
 main #preview p,
 #content p {
 	white-space: nowrap;
+}
+
+#content p.translation {
+	margin: -2vh 0 2vh;
+	font-size: .8em;
+	font-style: italic;
+	color: var(--secondary);
+}
+
+#content p.translation + p.translation {
+	margin-top: -4vh;
 }
 
 main #control p.fill,

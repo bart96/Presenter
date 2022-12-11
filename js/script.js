@@ -452,6 +452,20 @@ const Config = new class extends Storable {
 		if(Config.get('hidePreview', true)) {
 			document.body.classList.add('hide-preview');
 		}
+
+		const showTranslation = Config.get('showTranslation', 'true');
+		if(showTranslation !== 'true') {
+			document.body.classList.add('hideTranslation');
+
+			if(showTranslation !== 'false') {
+				const style = new element('style').parent(document.head);
+
+				const visibleLanguages = showTranslation.split(',');
+				visibleLanguages.forEach(language => {
+					style.appendCSSRule(`body.hideTranslation p.translation.language_${language} {display: block}`);
+				});
+			}
+		}
 	}
 }
 
@@ -728,6 +742,8 @@ class GUI extends Loadable {
 		PopUp.onLoad(send => {
 			PopUp.send('visibility', 'mouse', Config.get('hideMouse', true));
 			PopUp.send('visibility', 'text', this.elementPreview.classList.contains('hide-text'));
+
+			PopUp.send('translation', Config.get('showTranslation', 'true'));
 
 			const song = this.elementPreview.getAttribute('song');
 			if(song) {
@@ -1024,7 +1040,7 @@ class GUI extends Loadable {
 					}
 				}
 				else {
-					this.to(0, !Config.get('doubleClickSmoothScrollBehaviour', false));
+					this.to(0, true);
 				}
 
 				return this;
@@ -1232,7 +1248,7 @@ class GUI extends Loadable {
 		return song;
 	}
 
-	addLine(block, line, className) {
+	addLine(block, line, translations) {
 		if(!line) {
 			line = '<br />';
 		}
@@ -1241,9 +1257,14 @@ class GUI extends Loadable {
 		let previewLine = new element('p').html(line);
 		this.elementPreview.appendChild(previewLine);
 
-		if(className) {
-			controlLine.class(className);
-			previewLine.class(className);
+		if(translations && translations.length > 0) {
+			translations.forEach(({language, text}) => {
+				new element('p')
+					.parent(block)
+					.html(text)
+					.class('translation', `language_${language}`)
+					.attribute('language', language);
+			});
 		}
 
 		this.lines.add(controlLine, previewLine);
@@ -1293,8 +1314,38 @@ class GUI extends Loadable {
 				return block;
 			}
 
+			const lines = [... song.blocks[order]];
+			let line = lines.shift();
 			block = createBlock();
 
+			while(lines.length > 0) {
+				if(line === SONG_SEPARATOR) {
+					block = createBlock();
+					line = lines.shift();
+				}
+				else {
+					const content = line;
+					const translations = [];
+
+					line = lines.shift();
+					let translation;
+
+					while(line && (translation = line.match(SONG_TRANSLATION_LINE_REGEX)) !== null) {
+						if(translation.length === 3) {
+							translations.push({
+								language: translation[1],
+								text: translation[2]
+							});
+						}
+
+						line = lines.shift();
+					}
+
+					this.addLine(block, content, translations);
+				}
+			}
+
+			/*
 			song.blocks[order].forEach(line => {
 				if(line === SONG_SEPARATOR) {
 					block = createBlock();
@@ -1303,6 +1354,7 @@ class GUI extends Loadable {
 					this.addLine(block, line);
 				}
 			});
+			 */
 		});
 
 		block = new element('span').class('copyright').parent(this.elementControl);

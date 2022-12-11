@@ -130,6 +130,26 @@ function file_prevent_caching($path) : void {
 						document.body.classList.remove(`hide-${params[0]}`);
 					}
 					break;
+				case 'translation':
+					const showTranslation = params[0];
+
+					if(showTranslation !== 'true') {
+						document.body.classList.add('hideTranslation');
+
+						if(showTranslation !== 'false') {
+							const style = document.createElement('style');
+							document.head.append(style);
+
+							const visibleLanguages = showTranslation.split(',');
+							visibleLanguages.forEach(language => {
+								style.sheet.insertRule(
+									`body.hideTranslation p.translation.language_${language} {display: block}`,
+									style.sheet.cssRules.length
+								);
+							});
+						}
+					}
+					break;
 				case 'closing':
 					let counter = 40;
 					const parentLoaded = params[0];

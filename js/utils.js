@@ -238,6 +238,11 @@ class element {
 		return this;
 	}
 
+	appendCSSRule(rule) {
+		this.element.sheet.insertRule(rule, this.element.sheet.cssRules.length);
+		return this;
+	}
+
 	selected(selected) {
 		this.element.selected = selected;
 		return this;
