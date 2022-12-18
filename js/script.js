@@ -1318,7 +1318,7 @@ class GUI extends Loadable {
 			let line = lines.shift();
 			block = createBlock();
 
-			while(lines.length > 0) {
+			while(line !== undefined) {
 				if(line === SONG_SEPARATOR) {
 					block = createBlock();
 					line = lines.shift();
@@ -1344,17 +1344,6 @@ class GUI extends Loadable {
 					this.addLine(block, content, translations);
 				}
 			}
-
-			/*
-			song.blocks[order].forEach(line => {
-				if(line === SONG_SEPARATOR) {
-					block = createBlock();
-				}
-				else {
-					this.addLine(block, line);
-				}
-			});
-			 */
 		});
 
 		block = new element('span').class('copyright').parent(this.elementControl);
