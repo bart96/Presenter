@@ -7,9 +7,14 @@
 
 		protected function get(Request &$req, Response &$res) : never {
 			$account = $req->account;
-			$limit = $req->path->getAsInt(0, 30);
+			$limit = $req->path->getAsInt(0, 10);
+			$offset = $req->path->getAsInt(1, 0) * $limit;
 
-			$result = [];
+			$result = [
+				"limit" => $limit,
+				"offset" => $offset,
+				"shows" => []
+			];
 
 			$stmt = self::prepare('
 				SELECT `title`, `order`
@@ -17,12 +22,13 @@
 				WHERE `account` = ?
 				ORDER BY `date` DESC
 				LIMIT ?
+				OFFSET ?
 			');
 
-			$stmt->bind_param('ii', $account, $limit)->execute()->bind_result($title, $order);
+			$stmt->bind_param('iii', $account, $limit, $offset)->execute()->bind_result($title, $order);
 
 			while($stmt->fetch()) {
-				$result[] = [
+				$result["shows"][] = [
 					'title' => $title,
 					'order' => explode(',', $order)
 				];

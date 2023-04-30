@@ -658,7 +658,7 @@ class GUI extends Loadable {
 				}
 
 				this.notifySubscriber('uploadShow', {title});
-				loadShows(this);
+				setTimeout(loadShows, 500);
 			});
 
 			let CCLIList = new element('button').text('Copy CCLI list').on('click', _ => {
@@ -667,8 +667,17 @@ class GUI extends Loadable {
 			}).child(copy);
 
 			const loadShows = _ => {
-				AJAX.get(`rest/Shows/${Config.get('showLimit', 30)}`).then(shows => {
-					wrapper.clear();
+				let offset = 0;
+
+				const loadMore = new element('li').text('Show more').on('click', _ => {
+					AJAX.get(`rest/Shows/${Config.get('showLimit', 10)}/${++offset}`).then(createShows).catch(e => {
+						Notification.error(e);
+						offset--;
+					});
+				});
+
+				const createShows = ({limit, shows}) => {
+					loadMore.remove();
 
 					shows.forEach(show => {
 						let li = new element('li').text(show.title).parent(wrapper).on('dblclick', _ => {
@@ -683,17 +692,18 @@ class GUI extends Loadable {
 							}
 						});
 
-						new element('button').type('button').class('setList').tooltip('CCLI reporting').parent(li).on('click', _ => {
-							let ccliNumbers = [];
-
-							show.order.forEach(songNumber => {
-								if(songNumber > SONG_CUSTOM_NUMBER_LIMIT) {
-									ccliNumbers.push(songNumber);
-								}
-							});
-
-							window.open(`https://reporting.ccli.com/search?s=${ccliNumbers.join('%7C')}`, '_blank');
+						const ccliNumbers = [];
+						show.order.forEach(songNumber => {
+							if(songNumber > SONG_CUSTOM_NUMBER_LIMIT) {
+								ccliNumbers.push(songNumber);
+							}
 						});
+
+						if(ccliNumbers.length > 0) {
+							new element('button').type('button').class('setList').tooltip('CCLI reporting').parent(li).on('click', _ => {
+								window.open(`https://reporting.ccli.com/search?s=${ccliNumbers.join('%7C')}`, '_blank');
+							});
+						}
 
 						new element('button').type('button').text('×').tooltip('delete').parent(li).on('click', _ => {
 							if(!Config.get('confirmShowDeletion', true) || confirm('Delete show?')) {
@@ -702,24 +712,23 @@ class GUI extends Loadable {
 							}
 						});
 					});
+
+					if(shows.length >= limit) {
+						loadMore.parent(wrapper);
+					}
+				};
+
+				AJAX.get(`rest/Shows/${Config.get('showLimit', 10)}`).then(({limit, shows}) => {
+					wrapper.clear();
+					createShows(({limit, shows}));
 				}).catch(e => {
 					Notification.error(e);
 					this.save.remove();
 				});
 			}
 
-			loadShows(this);
+			loadShows();
 			Modal.show('Shows', wrapper).width('375px').resizable('235px').foot(newShow, CCLIList);
-
-			AJAX.get(`rest/ShowsNumbers/${Config.get('showLimit', 30)}`).then(shows => {
-				let result = [];
-
-				shows.forEach(({title, songNumbers}) => {
-					result.push([title, ... songNumbers].join('\n'));
-				});
-
-				copy.value(result.join('\n\n'));
-			}).catch(e => Notification.error(e));
 		}).tooltip('Shows');
 
 		this.account = new element('li').class('account').parent(this.elementNav).on('click', _ => {
