@@ -200,6 +200,7 @@ const Modal = new class {
 		this.modal = new element('div').class('modal');
 		this.callback = null;
 
+		new element('div').class('background').parent(this.modal).ignore('contextmenu');
 		this.container = new element('div').class('container').parent(this.modal).ignore('contextmenu');
 		let header = new element('header').parent(this.container);
 		this.content = new element('div').class('content').parent(this.container);
@@ -749,6 +750,9 @@ class GUI extends Loadable {
 		}).tooltip('Block screen popup');
 
 		PopUp.onLoad(send => {
+			PopUp.send('margin', Config.get('popupMargin', '1vw 0 .5vw'));
+			PopUp.send('padding', Config.get('popupPadding', '20px 0'));
+
 			PopUp.send('visibility', 'mouse', Config.get('hideMouse', true));
 			PopUp.send('visibility', 'text', this.elementPreview.classList.contains('hide-text'));
 

@@ -102,15 +102,14 @@ function file_prevent_caching($path) : void {
 							content.removeChild(content.firstElementChild);
 						}
 
-						let isBlack = content.classList.contains('hide-text');
-
-						content.style = currentActive.classList.contains('copyright') ? 'opacity: 0' : '';
+						content.style.opacity = currentActive.classList.contains('copyright') ? '0' : '';
 						content.className = currentActive.className;
 
 						Array.from(currentActive.getElementsByTagName('p')).forEach(child => {
 							content.append(child.cloneNode(true));
 						});
 
+						const isBlack = content.classList.contains('hide-text');
 						if(isBlack) {
 							content.classList.add('hide-text');
 						}
@@ -129,6 +128,12 @@ function file_prevent_caching($path) : void {
 					else {
 						document.body.classList.remove(`hide-${params[0]}`);
 					}
+					break;
+				case 'margin':
+					content.style.margin = params[0];
+					break;
+				case 'padding':
+					content.style.padding = params[0];
 					break;
 				case 'translation':
 					const showTranslation = params[0];

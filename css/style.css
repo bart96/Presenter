@@ -679,6 +679,15 @@ main #preview p.copyright small {
 	display: block;
 }
 
+.modal .background {
+	position: fixed;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	background: rgba(0, 0, 0, .65);
+}
+
 .modal .container {
 	position: relative;
 	margin: auto;
@@ -1008,8 +1017,8 @@ main #songs label,
 }
 
 #content {
-	margin: 2vw 0 1vw;
-	padding: 30px 0;
+	margin: 1vw 0 .5vw;
+	padding: 20px 0;
 	font-size: 4vw;
 	line-height: 6vw;
 }
