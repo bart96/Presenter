@@ -158,6 +158,19 @@ class Song {
 		return this;
 	}
 
+	generateBlockName(type) {
+		if(this.initialOrder.includes(type)) {
+			let counter = 1;
+			while(this.initialOrder.includes(`${type} [${counter}]`)) {
+				counter++;
+			}
+
+			return `${type} [${counter}]`;
+		}
+
+		return type;
+	}
+
 	saveOrder(order) {
 		this.order = order;
 		return this;
@@ -177,64 +190,95 @@ class Song {
 }
 
 class CCLISong extends Song {
-	static parse(content) {
+	static parse(content, filename) {
 		const song = new CCLISong();
 
-		const blocks = content.trim().split('\r\n\r\nCCLI-');
-		const text = blocks.shift();
+		// format 2023-07
+		if(filename.endsWith('-lyrics.txt')) {
+			const blocks = content.trim().split('\n\n');
+			console.log(blocks);
 
-		if(blocks.length === 1) {
-			const info = blocks.shift();
-			const rows = info.trim().split('\r\n');
+			song.title = blocks.shift().trim();
 
-			song.songNumber = parseInt(rows.shift().replace(/\D/g, ''));
-			song.authors = rows.shift().trim();
-			if(song.authors.toUpperCase() === SONG_UNKNOWN_AUTHOR) {
-				song.authors = SONG_UNKNOWN_AUTHOR;
-			}
-
-			song.account = parseInt(rows.pop().replace(/\D/g, ''));
-			const url = rows.pop().trim(); // url
-			if(url !== 'www.ccli.com') {
-				rows.push(url);
-			}
-
-			const licenseNotes = rows.pop().trim();
-			if(!licenseNotes.includes('SongSelect®')) {
-				rows.push(licenseNotes);
-			}
+			const info = blocks.pop().split('\n');
+			song.authors = info.shift().trim();
+			song.songNumber = parseInt(info.shift().replace(/\D/g, ''));
+			song.account = parseInt(info.pop().replace(/\D/g, ''));
 
 			const copyright = [];
-			while(!rows[0].startsWith('© ')) {
-				rows.shift();
+			while(info[0] && !info[0].startsWith('© ')) {
+				info.shift();
 			}
-			rows.forEach(row => {
-				row = row.trim();
-				if(row && !row.includes('Public Domain')) {
-					copyright.push(row);
+			while(info[0] && !info[0].endsWith('www.ccli.com')) {
+				const line = info.shift().trim();
+				if(line && !line.includes('Public Domain')) {
+					copyright.push(line);
 				}
-			});
+			}
 
 			song.copyright = copyright.join(' | ');
+
+			blocks.forEach(block => {
+				const row = block.split('\n').filter(e => e !== '');
+				let type = song.generateBlockName(row.shift());
+
+				song.order.push(type);
+				song.initialOrder.push(type);
+				song.blocks[type] = row;
+			});
 		}
+		else {
+			const blocks = content.trim().split('\r\n\r\nCCLI-');
+			const text = blocks.shift();
 
-		const rows = text.trim().split('\r\n');
-		let duplicates = 0;
+			if(blocks.length === 1) {
+				const info = blocks.shift();
+				const rows = info.trim().split('\r\n');
 
-		song.title = rows.splice(0, 3).shift();
+				song.songNumber = parseInt(rows.shift().replace(/\D/g, ''));
+				song.authors = rows.shift().trim();
 
-		rows.join('\n').split('\n\n\n').forEach(block => {
-			const row = block.split('\n').filter(e => e !== '');
-			let type = row.shift();
+				song.account = parseInt(rows.pop().replace(/\D/g, ''));
+				const url = rows.pop().trim(); // url
+				if(url !== 'www.ccli.com') {
+					rows.push(url);
+				}
 
-			if(song.initialOrder.includes(type)) {
-				type += ` [${++duplicates}]`;
+				const licenseNotes = rows.pop().trim();
+				if(!licenseNotes.includes('SongSelect®')) {
+					rows.push(licenseNotes);
+				}
+
+				const copyright = [];
+				while(!rows[0].startsWith('© ')) {
+					rows.shift();
+				}
+				rows.forEach(row => {
+					row = row.trim();
+					if(row && !row.includes('Public Domain')) {
+						copyright.push(row);
+					}
+				});
+
+				song.copyright = copyright.join(' | ');
 			}
 
-			song.order.push(type);
-			song.initialOrder.push(type);
-			song.blocks[type] = row;
-		});
+			const rows = text.trim().split('\r\n');
+			song.title = rows.splice(0, 3).shift();
+
+			rows.join('\n').split('\n\n\n').forEach(block => {
+				const row = block.split('\n').filter(e => e !== '');
+				let type = song.generateBlockName(row.shift());
+
+				song.order.push(type);
+				song.initialOrder.push(type);
+				song.blocks[type] = row;
+			});
+		}
+
+		if(song.authors.toUpperCase() === SONG_UNKNOWN_AUTHOR) {
+			song.authors = SONG_UNKNOWN_AUTHOR;
+		}
 
 		return song;
 	}
