@@ -28,8 +28,8 @@
 		storage.addSubscriber(gui.changeHandler);
 		gui.addSubscriber(storage.changeHandler);
 
-		new DragNDrop(e, ['text/plain'], 'over', element.from('#songs')).onFileLoaded(text => {
-			CCLISong.parse(text).exists().then(({exists, song}) => {
+		new DragNDrop(e, ['text/plain'], 'over', element.from('#songs')).onFileLoaded((text, filename) => {
+			CCLISong.parse(text, filename).exists().then(({exists, song}) => {
 				if(exists) {
 					let message = `The song "${song.title}" with number "${song.songNumber}" already exists\n`
 						+ 'Do you want to override it?';

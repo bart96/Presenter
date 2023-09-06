@@ -552,13 +552,13 @@ class DragNDrop {
 		let fileHandler = files => {
 			Array.from(files).forEach(file => {
 				if(filetypes.includes(file.type)) {
-					$.loaded.forEach(fn => {
-						let reader = new FileReader();
-						reader.addEventListener('load', e => {
-							fn(e.target.result);
+					let reader = new FileReader();
+					reader.addEventListener('load', e => {
+						$.loaded.forEach(fn => {
+							fn(e.target.result, file.name);
 						});
-						reader.readAsText(file);
 					});
+					reader.readAsText(file);
 				}
 				else {
 					$.errors.forEach(fn => {
