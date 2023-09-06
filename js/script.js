@@ -450,7 +450,7 @@ const Config = new class extends Storable {
 		if(Config.get('hideMouse', true)) {
 			document.body.classList.add('hide-mouse');
 		}
-		if(Config.get('hidePreview', true)) {
+		if(!Config.get('showPreview', false)) {
 			document.body.classList.add('hide-preview');
 		}
 
@@ -638,7 +638,7 @@ class GUI extends Loadable {
 
 			let newShow = new element('button').class('upload').text('New show').on('click', _ => {
 				let d = new Date();
-				let format = Config.get('ShowSaveFormat', 'Show {dd}.{MM}.{yyyy}');
+				let format = Config.get('showSaveFormat', 'Show {dd}.{MM}.{yyyy}');
 
 				const z = n => {
 					return (n < 10) ? `0${n}` : `${n}`;
@@ -736,6 +736,25 @@ class GUI extends Loadable {
 			Account.login();
 		}).tooltip('Account');
 
+		const getPreviewLines = block => {
+			const preview = [];
+			if(Config.get('showNextLinePreview', 'true') && block.nextElementSibling && !block.nextElementSibling.classList.contains('copyright')) {
+				let line = block.nextElementSibling.querySelector('p');
+				if(line) {
+					preview.push(line.cloneNode(true));
+
+					if(Config.get('showNextLinePreviewTranslation', 'true')) {
+						while(line.nextElementSibling && line.nextElementSibling.classList.contains('translation')) {
+							line = line.nextElementSibling;
+							preview.push(line.cloneNode(true));
+						}
+					}
+				}
+			}
+
+			return preview;
+		}
+
 		let popupWindow = new element('li').class('popup').parent(this.elementNav).on('click', _ => {
 			if(PopUp.inactive) {
 				PopUp.show();
@@ -765,7 +784,7 @@ class GUI extends Loadable {
 
 			const active = this.lines.getActiveControl();
 			if(active && active.parentElement) {
-				PopUp.send('active', active.parentElement);
+				PopUp.send('active', active.parentElement, getPreviewLines(active.parentElement));
 			}
 
 		}).onChange((message, ... params) => {
@@ -969,7 +988,7 @@ class GUI extends Loadable {
 				window.resizeTo(screen.availWidth, screen.availHeight);
 			});
 			const checkMaximized = _ => {
-				if(Config.get('hidePreview', true) || screen.availWidth - window.innerWidth === 0) {
+				if(!Config.get('showPreview', false) || screen.availWidth - window.innerWidth === 0) {
 					notMaximizedWarning.remove();
 				}
 				else {
@@ -1109,7 +1128,7 @@ class GUI extends Loadable {
 					}, this.blockScrollDelay);
 
 					if(!PopUp.inactive) {
-						PopUp.send('active', block);
+						PopUp.send('active', block, getPreviewLines(block));
 					}
 				}
 
@@ -1363,7 +1382,7 @@ class GUI extends Loadable {
 		let header = new element('h1').html('©<em>Copyright</em>').parent(block);
 		this.addLine(block, song.info.join('<br />')).class('copyright');
 
-		if(Config.get('hidePreview', true)) {
+		if(!Config.get('showPreview', false)) {
 			header.listener('click', _ => {
 				if(header.nextElementSibling) {
 					this.lines.to(header.nextElementSibling, !Config.get('headlineSmoothScrollBehaviour', false));

@@ -629,6 +629,16 @@ main #preview p,
 	color: var(--secondary);
 }
 
+#content p.preview {
+	margin-top: 2vh;
+	color: #444;
+}
+
+#content p.preview.translation {
+	margin-top: -2vh;
+	color: #666;
+}
+
 #content p.translation + p.translation {
 	margin-top: -4vh;
 }
@@ -971,12 +981,12 @@ main #songs label,
 	text-align: left;
 }
 
-.modal table.config tr:hover {
-	background: var(--primary);
-}
-
 .modal table.config tr:nth-child(2n + 1) {
 	background: var(--dark-highlight);
+}
+
+.modal table.config tr:hover {
+	background: var(--primary);
 }
 
 .modal table.config th,

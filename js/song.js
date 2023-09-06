@@ -76,7 +76,7 @@ class Song {
 		}
 
 		if(this.authors !== SONG_UNKNOWN_AUTHOR) {
-			info.push(`${Config.get('Authors', 'Autoren')}: ${this.authors}`);
+			info.push(`${Config.get('authors', 'Autoren')}: ${this.authors}`);
 		}
 
 		if(this.copyright !== SONG_UNKNOWN_COPYRIGHT) {

@@ -21,6 +21,10 @@ function file_prevent_caching($path) : void {
 			opacity: 0;
 		}
 
+		body.hide-preview #content p.preview {
+			display: none;
+		}
+
 		#content button {
 			margin-top: 30vh;
 			padding: 10px 15px;
@@ -97,6 +101,7 @@ function file_prevent_caching($path) : void {
 				case 'active':
 					if(currentActive !== params[0]) {
 						currentActive = params[0];
+						const preview = params[1];
 
 						while(content.firstElementChild) {
 							content.removeChild(content.firstElementChild);
@@ -108,6 +113,13 @@ function file_prevent_caching($path) : void {
 						Array.from(currentActive.getElementsByTagName('p')).forEach(child => {
 							content.append(child.cloneNode(true));
 						});
+
+						if(preview) {
+							preview.forEach(line => {
+								line.classList.add('preview');
+								content.append(line);
+							});
+						}
 
 						const isBlack = content.classList.contains('hide-text');
 						if(isBlack) {
