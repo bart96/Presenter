@@ -53,17 +53,31 @@ function file_prevent_caching($path) : void {
 		button.onclick = _ => {
 			document.body.requestFullscreen();
 			button.parentElement.removeChild(button);
-		}
+		};
+
+		const requestFullscreen = () => {
+			document.body.requestFullscreen();
+			if(button.parentElement) {
+				button.parentElement.removeChild(button);
+			}
+		};
+
+		document.onkeydown = (e) => {
+			switch(e.code) {
+				case 'KeyF':
+					if(!window.fullScreen) {
+						requestFullscreen();
+					}
+					break;
+			}
+		};
 
 		document.body.ondblclick = _ => {
 			if(window.fullScreen) {
 				document.exitFullscreen();
 			}
 			else {
-				document.body.requestFullscreen();
-				if(button.parentElement) {
-					button.parentElement.removeChild(button);
-				}
+				requestFullscreen();
 			}
 		};
 
