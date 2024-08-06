@@ -17,23 +17,26 @@
 					$search = self::prepareSearchParameter($query);
 
 					$stmt = self::prepare('
-						SELECT `songNumber`, `title`
+						SELECT 
+							`songNumber`, 
+							`title`, 
+							AVG(`score`) as `avg_score` 
 						FROM (
-							SELECT `songNumber`, `title`, AVG(`score`) as `score` 
-							FROM (
-								SELECT `songs`.`songNumber`, `songs`.`title`, MATCH(`blocks`.`text`) AGAINST (? IN BOOLEAN MODE) AS score
-								FROM `songs`
-								INNER JOIN `blocks` ON `songs`.`songNumber` = `blocks`.`songNumber` AND `blocks`.`account` = ?
-								/*WHERE `songs`.`account` = ?*/
-							) t
-							WHERE `score` > 0
-							GROUP BY `songNumber`, `title`
-							ORDER BY `score` DESC, `title`
-							LIMIT ?
+							SELECT 
+								`songs`.`songNumber`, 
+								`songs`.`title`, 
+								MATCH(`blocks`.`text`) AGAINST (? IN BOOLEAN MODE) AS `score`
+							FROM `songs`
+							INNER JOIN `blocks` 
+								ON `songs`.`songNumber` = `blocks`.`songNumber` 
+							WHERE `blocks`.`account` = ?
 						) t
+						WHERE `score` > 0
+						GROUP BY `songNumber`, `title`
+						ORDER BY `avg_score` DESC, `title`
+						LIMIT ?
 					');
 
-					//$stmt->bind_param('siii', $search, $account, $account, SEARCH_RESULT_LIMIT);
 					$stmt->bind_param('sii', $search, $account, SEARCH_RESULT_LIMIT)->execute()->fetchAll($result)->close();
 					break;
 				case 'number':
@@ -54,18 +57,24 @@
 					$search = self::prepareSearchParameter($query);
 
 					$stmt = self::prepare('
-						SELECT `songNumber`, `title`
-						FROM (
-							SELECT `songNumber`, `title`, MATCH(`title`) AGAINST (? IN BOOLEAN MODE) AS score
-							FROM `songs`
-							WHERE `account` = ?
-							ORDER BY `score` DESC, `title`
-						) t
-						WHERE t.score > 0
+						SELECT 
+							`songNumber`, 
+							`title`,
+							MATCH(`title`) AGAINST (? IN BOOLEAN MODE) AS relevance
+						FROM `songs`
+						WHERE 
+							`account` = ?
+							AND (
+								`title` LIKE ?
+								OR MATCH(`title`) AGAINST (? IN BOOLEAN MODE)
+							)
+						ORDER BY 
+							relevance DESC, 
+							`title`
 						LIMIT ?
 					');
 
-					$stmt->bind_param('sii', $search, $account, SEARCH_RESULT_LIMIT)->execute()->fetchAll($result)->close();
+					$stmt->bind_param('sissi', $search, $account, "%${query}%", $search, SEARCH_RESULT_LIMIT)->execute()->fetchAll($result)->close();
 			}
 
 			$res->success($result);
