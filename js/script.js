@@ -500,7 +500,7 @@ const Config = new class extends Storable {
 					this.data[key] = parseFloat(value.replace(/[^-+\d.]+|(?<=\..*)\./g, '') || 0);
 					break;
 				case 'boolean':
-					this.data[key] = value === 'true';
+					this.data[key] = typeof value === 'boolean' ? value : value === 'true';
 					break;
 				default:
 					this.data[key] = value;
@@ -687,6 +687,8 @@ class GUI extends Loadable {
 
 		new element('li').class('sidebar').parent(this.elementNav).on('click', _ => {
 			let shrunk = !Config.get('SHRINK_SIDEBAR');
+
+			console.log(shrunk, Config.get('SHRINK_SIDEBAR'), Config.data);
 
 			Config.set('SHRINK_SIDEBAR', shrunk);
 
@@ -901,12 +903,20 @@ class GUI extends Loadable {
 			}
 		});
 
+		const isLoggedIn = () => {
+			if(!Account.isLoggedIn) {
+				Notification.error('Please log in');
+				Account.login();
+			}
+
+			return Account.isLoggedIn;
+		}
+
 		this.search = new element('input').parent(search);
 		let searchResults = new element('ul').parent(search);
 		let searchRequest = mode => {
-			if(!Account.isLoggedIn) {
+			if(!isLoggedIn()) {
 				searchResults.clear();
-				Notification.error('Please log in');
 				return;
 			}
 
@@ -937,6 +947,8 @@ class GUI extends Loadable {
 			}
 		};
 		new element('button').type('button').class('all').parent(search).on('click', _ => {
+			if(!isLoggedIn()) return;
+
 			AJAX.get(`rest/SongsAll/${Config.get('SONG_OVERVIEW_ORDER')}`).then(songs => {
 				let wrapper = new element('ul').class('songs');
 
