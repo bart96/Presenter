@@ -161,24 +161,19 @@ function file_prevent_caching($path) : void {
 				case 'padding':
 					content.style.padding = params[0];
 					break;
-				case 'translation':
-					const showTranslation = params[0];
+				case 'translations':
+					const translations = params[0];
 
-					if(showTranslation !== 'true') {
-						document.body.classList.add('hideTranslation');
+					if(translations !== 'none') {
+						const style = document.createElement('style');
+						document.head.append(style);
 
-						if(showTranslation !== 'false') {
-							const style = document.createElement('style');
-							document.head.append(style);
-
-							const visibleLanguages = showTranslation.split(',');
-							visibleLanguages.forEach(language => {
-								style.sheet.insertRule(
-									`body.hideTranslation p.translation.language_${language} {display: block}`,
-									style.sheet.cssRules.length
-								);
-							});
-						}
+						translations.split(',').forEach(language => {
+							style.sheet.insertRule(
+								`p.translation.language.language_${language} {display: block}`,
+								style.sheet.cssRules.length
+							);
+						});
 					}
 					break;
 				case 'closing':

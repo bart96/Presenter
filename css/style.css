@@ -124,7 +124,7 @@ body.hide-preview .modal .container .song textarea {
 	max-height: 450px;
 }
 
-body.hideTranslation p.translation {
+p.translation.language {
 	display: none;
 }
 
@@ -994,8 +994,9 @@ main #songs label,
 	padding: 10px 15px;
 }
 
-.modal table.config td[reset="true"] {
-	opacity: .2;
+.modal table.config select {
+	padding: 6px 8px;
+	cursor: pointer;
 }
 
 .modal footer {

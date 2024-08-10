@@ -34,7 +34,7 @@
 					let message = `The song "${song.title}" with number "${song.songNumber}" already exists\n`
 						+ 'Do you want to override it?';
 
-					if(Config.get('overrideSongByImport', false) || confirm(message)) {
+					if(Config.get('OVERRIDE_SONG_BY_IMPORT') || confirm(message)) {
 						storage.addSong(song).upload(true);
 					}
 				}

@@ -369,7 +369,7 @@ const Notification = new class extends Loadable {
 	}
 
 	message(message, type) {
-		while(this.container.children.length > Config.get('notificationCount', 4)) {
+		while(this.container.children.length > Config.get('NOTIFICATION_COUNT')) {
 			this.container.popChild();
 		}
 
@@ -389,7 +389,7 @@ const Notification = new class extends Loadable {
 
 		setTimeout(_ => {
 			alert.remove();
-		}, Config.get('notificationDisappearTime', 3500));
+		}, Config.get('NOTIFICATION_DISAPPEAR_TIME'));
 	}
 
 	success(message) {
@@ -405,29 +405,106 @@ const Notification = new class extends Loadable {
 	}
 }
 
+/**
+ * @typedef { 'AUTHORS' | 'CCLI_LICENSE_NUMBER' | 'CONFIRM_PAGE_LEAVE' | 'CONFIRM_SHOW_DELETION' |
+ * 'CONFIRM_SHOW_OVERWRITE' | 'CONFIRM_SONG_DELETE' | 'DEFAULT_NEW_VERSE_NAME' | 'DEFAULT_VERSE_NAME' |
+ * 'HEADLINE_SMOOTH_SCROLL_BEHAVIOUR' | 'HIDE_MOUSE' | 'NOTIFICATION_COUNT' |
+ * 'NOTIFICATION_DISAPPEAR_TIME' | 'OVERRIDE_SONG_BY_IMPORT' | 'POPUP_HEIGHT' |
+ * 'POPUP_LEFT' | 'POPUP_MARGIN' | 'POPUP_PADDING' | 'POPUP_TOP' | 'POPUP_WIDTH' |
+ * 'RELOAD_SONG_AFTER_EDIT' | 'RESET_BLACK_ON_SONG_SWITCH' | 'SHOW_HIDE_MOUSE' |
+ * 'SHOW_LIMIT' | 'SHOW_NEXT_LINE_PREVIEW' | 'SHOW_NEXT_LINE_PREVIEW_TRANSLATION' |
+ * 'SHOW_PREVIEW' | 'SHOW_REMOVE_SONG_FROM_DATABASE' | 'SHOW_SAVE_FORMAT' |
+ * 'SHOW_SONG_UPLOAD_NOTIFICATIONS' | 'SHOWN_TRANSLATIONS' | 'SHRINK_SIDEBAR' |
+ * 'SONG_CLICK_BEHAVIOUR' | 'SONG_OVERVIEW_ORDER' | 'THEME' | 'TOUCH_DURATION' |
+ * 'USE_ARROWS_FOR_MOVING_BETWEEN_BLOCKS' | 'USE_ARROWS_FOR_MOVING_BETWEEN_LINES' |
+ * 'VERSE_CLICK_BEHAVIOUR' } ConfigKey
+ */
+
 const Config = new class extends Storable {
+	/**
+	 * @type {Object.<ConfigKey, any>}
+	 */
+	options = {
+		AUTHORS: 'Autoren',
+		CCLI_LICENSE_NUMBER: 'CCLI-Lizenznummer',
+		CONFIRM_PAGE_LEAVE: [true, false],
+		CONFIRM_SHOW_DELETION: [true, false],
+		CONFIRM_SHOW_OVERWRITE: [true, false],
+		CONFIRM_SONG_DELETE: [true, false],
+		DEFAULT_NEW_VERSE_NAME: 'Outro',
+		DEFAULT_VERSE_NAME: 'Vers 1',
+		HEADLINE_SMOOTH_SCROLL_BEHAVIOUR: [false, true],
+		HIDE_MOUSE: [true, false],
+		NOTIFICATION_COUNT: 4,
+		NOTIFICATION_DISAPPEAR_TIME: 3500,
+		OVERRIDE_SONG_BY_IMPORT: [false, true],
+		POPUP_HEIGHT: 350,
+		POPUP_LEFT: 0,
+		POPUP_MARGIN: '1vw 0 .5vw',
+		POPUP_PADDING: '20px 0',
+		POPUP_TOP: 0,
+		POPUP_WIDTH: 450,
+		RELOAD_SONG_AFTER_EDIT: [false, true],
+		RESET_BLACK_ON_SONG_SWITCH: [false, true],
+		SHOW_HIDE_MOUSE: [false, true],
+		SHOW_LIMIT: 10,
+		SHOW_NEXT_LINE_PREVIEW: [true, false],
+		SHOW_NEXT_LINE_PREVIEW_TRANSLATION: [true, false],
+		SHOW_PREVIEW: [false, true],
+		SHOW_REMOVE_SONG_FROM_DATABASE: [false, true],
+		SHOW_SAVE_FORMAT: 'Show {dd}.{MM}.{yyyy}',
+		SHOW_SONG_UPLOAD_NOTIFICATIONS: [true, false],
+		SHOWN_TRANSLATIONS: 'none',
+		SHRINK_SIDEBAR: [false, true],
+		SONG_CLICK_BEHAVIOUR: ['dblclick', 'click'],
+		SONG_OVERVIEW_ORDER: ['lexicographic', 'numeric'],
+		THEME: ['boxed', 'default', 'calibration'],
+		TOUCH_DURATION: 300,
+		USE_ARROWS_FOR_MOVING_BETWEEN_BLOCKS: [true, false],
+		USE_ARROWS_FOR_MOVING_BETWEEN_LINES: [true, false],
+		VERSE_CLICK_BEHAVIOUR: ['dblclick', 'click']
+	};
+
 	constructor() {
 		super('config', {});
 	}
 
-	get(item, defaultValue) {
-		if(this.data[item] === undefined) {
-			if(defaultValue === undefined) {
-				defaultValue = false;
-			}
+	/**
+	 * @param {ConfigKey} key
+	 * @returns {*}
+	 */
+	get(key) {
+		const defaultValue = Array.isArray(this.options[key]) ? this.options[key][0] : this.options[key];
 
-			this.data[item] = defaultValue;
+		if(typeof defaultValue === 'boolean' && typeof this.data[key] !== 'boolean') {
+			return this.data[key] === 'true';
 		}
 
-		return this.data[item];
+		return this.data[key] === undefined ? defaultValue : this.data[key];
 	}
 
-	set(item, value) {
+	/**
+	 * @param {ConfigKey} key
+	 * @param value
+	 * @returns {this}
+	 */
+	set(key, value) {
+		const defaultValue = Array.isArray(this.options[key]) ? this.options[key][0] : this.options[key];
+
 		if(value === '' || value === undefined) {
-			delete this.data[item];
+			this.data[key] = defaultValue;
 		}
 		else {
-			this.data[item] = value;
+			switch(typeof defaultValue) {
+				case 'number':
+					this.data[key] = parseFloat(value.replace(/[^-+\d.]+|(?<=\..*)\./g, '') || 0);
+					break;
+				case 'boolean':
+					this.data[key] = value === 'true';
+					break;
+				default:
+					this.data[key] = value;
+			}
 		}
 
 		return this;
@@ -440,32 +517,38 @@ const Config = new class extends Storable {
 
 	forEach(fn) {
 		Object.keys(this.data).sort(Intl.Collator().compare).forEach(key => {
-			fn(this.data[key], key, this.data);
+			fn(this.data[key], key, this.data, this.options[key]);
 		});
+	}
+
+	convert(data) {
+		this.data = {};
+
+		for(const [key, value] of Object.entries(this.options)) {
+			this.data[key] = data[key] ?? (Array.isArray(value) ? value[0] : value);
+		}
 	}
 
 	load() {
 		super.load();
 
-		if(Config.get('hideMouse', true)) {
+		if(this.get('HIDE_MOUSE')) {
 			document.body.classList.add('hide-mouse');
 		}
-		if(!Config.get('showPreview', false)) {
+		if(!this.get('SHOW_PREVIEW')) {
 			document.body.classList.add('hide-preview');
 		}
 
-		const showTranslation = Config.get('showTranslation', 'true');
-		if(showTranslation !== 'true') {
-			document.body.classList.add('hideTranslation');
+		const translations = this.get('SHOWN_TRANSLATIONS');
 
-			if(showTranslation !== 'false') {
-				const style = new element('style').parent(document.head);
+		if(translations !== 'none') {
+			const style = new element('style').parent(document.head);
 
-				const visibleLanguages = showTranslation.split(',');
-				visibleLanguages.forEach(language => {
-					style.appendCSSRule(`body.hideTranslation p.translation.language_${language} {display: block}`);
-				});
-			}
+			console.log(this.get, this.data, this.options, this.get('SHOWN_TRANSLATIONS'))
+
+			this.get('SHOWN_TRANSLATIONS').split(',').forEach(language => {
+				style.appendCSSRule(`p.translation.language.language_${language} {display: block}`);
+			});
 		}
 	}
 }
@@ -497,10 +580,10 @@ const PopUp = new class extends Loadable {
 				toolbar: 'no',
 				menubar: 'no',
 				fullscreen: 'yes',
-				top: Config.get('popupTop', 0),
-				left: Config.get('popupLeft', 0),
-				width: Config.get('popupWidth', '450'),
-				height: Config.get('popupHeight', '350')
+				top: Config.get('POPUP_TOP'),
+				left: Config.get('POPUP_LEFT'),
+				width: Config.get('POPUP_WIDTH'),
+				height: Config.get('POPUP_HEIGHT')
 			}).map(x => x.join('=')).join(',');
 
 			this.popup = window.open('', '_blank', params);
@@ -508,7 +591,7 @@ const PopUp = new class extends Loadable {
 			if(this.popup) {
 				this.popup.document.open();
 				// base64 content of view.php
-				this.popup.document.write(atob('PCFET0NUWVBFIGh0bWw+DQo8aHRtbCBsYW5nPSJlbiI+DQo8aGVhZD4NCgk8bWV0YSBjaGFyc2V0PSJVVEYtOCI+DQoJPHRpdGxlPlByZXNlbnRlcjwvdGl0bGU+DQoNCgk8bGluayByZWw9InN0eWxlc2hlZXQiIGhyZWY9ImNzcy9zdHlsZS5jc3MiIG1lZGlhPSJhbGwiPg0KCTxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0iY3NzL2JhY2tncm91bmQuY3NzIiBtZWRpYT0iYWxsIj4NCgk8c3R5bGU+DQoJCWJvZHk6ZnVsbHNjcmVlbi5oaWRlLW1vdXNlIHsNCgkJCWN1cnNvcjogbm9uZTsNCgkJfQ0KDQoJCWJvZHkuaGlkZS1iYWNrZ3JvdW5kICNiYWNrZ3JvdW5kIHsNCgkJCW9wYWNpdHk6IDA7DQoJCX0NCg0KCQlib2R5LmhpZGUtcHJldmlldyAjY29udGVudCBwLnByZXZpZXcgew0KCQkJZGlzcGxheTogbm9uZTsNCgkJfQ0KDQoJCSNjb250ZW50IGJ1dHRvbiB7DQoJCQltYXJnaW4tdG9wOiAzMHZoOw0KCQkJcGFkZGluZzogMTBweCAxNXB4Ow0KCQkJZm9udC1zaXplOiA0dnc7DQoJCQlib3JkZXItcmFkaXVzOiAxNXB4Ow0KCQkJY29sb3I6IHZhcigtLWJyaWdodCk7DQoJCQliYWNrZ3JvdW5kOiB2YXIoLS1wcmltYXJ5KTsNCgkJCXZlcnRpY2FsLWFsaWduOiBtaWRkbGU7DQoJCQljdXJzb3I6IHBvaW50ZXI7DQoJCX0NCg0KCQkjY29udGVudCBidXR0b246aG92ZXIgew0KCQkJYmFja2dyb3VuZDogdmFyKC0taGlnaGxpZ2h0KTsNCgkJfQ0KCTwvc3R5bGU+DQo8L2hlYWQ+DQo8Ym9keT4NCgk8ZGl2IGlkPSJiYWNrZ3JvdW5kIj48L2Rpdj4NCgk8ZGl2IGlkPSJjb250ZW50Ij4NCgkJPGJ1dHRvbiB0eXBlPSJidXR0b24iPkFjdGl2YXRlIEZ1bGxzY3JlZW48L2J1dHRvbj4NCgk8L2Rpdj4NCg0KCTxzY3JpcHQ+DQoJCWNvbnN0IGNvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKCcjY29udGVudCcpOw0KCQljb25zdCBidXR0b24gPSBjb250ZW50LnF1ZXJ5U2VsZWN0b3IoJ2J1dHRvbicpOw0KCQlidXR0b24ub25jbGljayA9IF8gPT4gew0KCQkJZG9jdW1lbnQuYm9keS5yZXF1ZXN0RnVsbHNjcmVlbigpOw0KCQkJYnV0dG9uLnBhcmVudEVsZW1lbnQucmVtb3ZlQ2hpbGQoYnV0dG9uKTsNCgkJfTsNCg0KCQljb25zdCByZXF1ZXN0RnVsbHNjcmVlbiA9ICgpID0+IHsNCgkJCWRvY3VtZW50LmJvZHkucmVxdWVzdEZ1bGxzY3JlZW4oKTsNCgkJCWlmKGJ1dHRvbi5wYXJlbnRFbGVtZW50KSB7DQoJCQkJYnV0dG9uLnBhcmVudEVsZW1lbnQucmVtb3ZlQ2hpbGQoYnV0dG9uKTsNCgkJCX0NCgkJfTsNCg0KCQlkb2N1bWVudC5vbmtleWRvd24gPSAoZSkgPT4gew0KCQkJc3dpdGNoKGUuY29kZSkgew0KCQkJCWNhc2UgJ0tleUYnOg0KCQkJCQlpZighd2luZG93LmZ1bGxTY3JlZW4pIHsNCgkJCQkJCXJlcXVlc3RGdWxsc2NyZWVuKCk7DQoJCQkJCX0NCgkJCQkJYnJlYWs7DQoJCQl9DQoJCX07DQoNCgkJZG9jdW1lbnQuYm9keS5vbmRibGNsaWNrID0gXyA9PiB7DQoJCQlpZih3aW5kb3cuZnVsbFNjcmVlbikgew0KCQkJCWRvY3VtZW50LmV4aXRGdWxsc2NyZWVuKCk7DQoJCQl9DQoJCQllbHNlIHsNCgkJCQlyZXF1ZXN0RnVsbHNjcmVlbigpOw0KCQkJfQ0KCQl9Ow0KDQoJCWRvY3VtZW50LmJvZHkub25jb250ZXh0bWVudSA9IGUgPT4gew0KCQkJaWYod2luZG93LmZ1bGxTY3JlZW4gJiYgZG9jdW1lbnQuYm9keS5jbGFzc0xpc3QuY29udGFpbnMoJ2hpZGUtbW91c2UnKSkgew0KCQkJCWUucHJldmVudERlZmF1bHQoKTsNCgkJCQllLnN0b3BQcm9wYWdhdGlvbigpOw0KCQkJfQ0KCQl9DQoNCgkJbGV0IHJlc2l6ZUhhbmRsZXJUaW1lb3V0ID0gZmFsc2U7DQoJCXdpbmRvdy5yZXNpemVIYW5kbGVyID0gbnVsbDsNCgkJZG9jdW1lbnQuYm9keS5vbnJlc2l6ZSA9IF8gPT4gew0KCQkJaWYod2luZG93LnJlc2l6ZUhhbmRsZXIpIHsNCgkJCQlpZihyZXNpemVIYW5kbGVyVGltZW91dCAhPT0gZmFsc2UpIHsNCgkJCQkJY2xlYXJUaW1lb3V0KHJlc2l6ZUhhbmRsZXJUaW1lb3V0KTsNCgkJCQl9DQoNCgkJCQlyZXNpemVIYW5kbGVyVGltZW91dCA9IHNldFRpbWVvdXQoXyA9PiB7DQoJCQkJCXdpbmRvdy5yZXNpemVIYW5kbGVyKHsNCgkJCQkJCXBvcHVwVG9wOiB3aW5kb3cuc2NyZWVuWSwNCgkJCQkJCXBvcHVwTGVmdDogd2luZG93LnNjcmVlblgsDQoJCQkJCQlwb3B1cFdpZHRoOiB3aW5kb3cuaW5uZXJXaWR0aCwNCgkJCQkJCXBvcHVwSGVpZ2h0OiB3aW5kb3cuaW5uZXJIZWlnaHQNCgkJCQkJfSk7DQoNCgkJCQkJcmVzaXplSGFuZGxlclRpbWVvdXQgPSBmYWxzZTsNCgkJCQl9LCA5MDApOw0KCQkJfQ0KCQl9DQoNCgkJbGV0IGN1cnJlbnRBY3RpdmUgPSBudWxsOw0KCQl3aW5kb3cuaGFuZGxlciA9ICh0eXBlLCBjYWxsYmFjaywgLi4uIHBhcmFtcykgPT4gew0KCQkJc3dpdGNoKHR5cGUpIHsNCgkJCQljYXNlICdhY3RpdmUnOg0KCQkJCQlpZihjdXJyZW50QWN0aXZlICE9PSBwYXJhbXNbMF0pIHsNCgkJCQkJCWN1cnJlbnRBY3RpdmUgPSBwYXJhbXNbMF07DQoJCQkJCQljb25zdCBwcmV2aWV3ID0gcGFyYW1zWzFdOw0KDQoJCQkJCQl3aGlsZShjb250ZW50LmZpcnN0RWxlbWVudENoaWxkKSB7DQoJCQkJCQkJY29udGVudC5yZW1vdmVDaGlsZChjb250ZW50LmZpcnN0RWxlbWVudENoaWxkKTsNCgkJCQkJCX0NCg0KCQkJCQkJY29udGVudC5zdHlsZS5vcGFjaXR5ID0gY3VycmVudEFjdGl2ZS5jbGFzc0xpc3QuY29udGFpbnMoJ2NvcHlyaWdodCcpID8gJzAnIDogJyc7DQoJCQkJCQljb250ZW50LmNsYXNzTmFtZSA9IGN1cnJlbnRBY3RpdmUuY2xhc3NOYW1lOw0KDQoJCQkJCQlBcnJheS5mcm9tKGN1cnJlbnRBY3RpdmUuZ2V0RWxlbWVudHNCeVRhZ05hbWUoJ3AnKSkuZm9yRWFjaChjaGlsZCA9PiB7DQoJCQkJCQkJY29udGVudC5hcHBlbmQoY2hpbGQuY2xvbmVOb2RlKHRydWUpKTsNCgkJCQkJCX0pOw0KDQoJCQkJCQlpZihwcmV2aWV3KSB7DQoJCQkJCQkJcHJldmlldy5mb3JFYWNoKGxpbmUgPT4gew0KCQkJCQkJCQlsaW5lLmNsYXNzTGlzdC5hZGQoJ3ByZXZpZXcnKTsNCgkJCQkJCQkJY29udGVudC5hcHBlbmQobGluZSk7DQoJCQkJCQkJfSk7DQoJCQkJCQl9DQoNCgkJCQkJCWNvbnN0IGlzQmxhY2sgPSBjb250ZW50LmNsYXNzTGlzdC5jb250YWlucygnaGlkZS10ZXh0Jyk7DQoJCQkJCQlpZihpc0JsYWNrKSB7DQoJCQkJCQkJY29udGVudC5jbGFzc0xpc3QuYWRkKCdoaWRlLXRleHQnKTsNCgkJCQkJCX0NCgkJCQkJfQ0KCQkJCQlicmVhazsNCgkJCQljYXNlICdzb25nJzoNCgkJCQkJZG9jdW1lbnQuYm9keS5pZCA9IGBzb25nXyR7cGFyYW1zWzBdfWA7DQoJCQkJCWJyZWFrOw0KCQkJCWNhc2UgJ3RvZ2dsZVZpc2liaWxpdHknOg0KCQkJCQljYWxsYmFjayhwYXJhbXNbMF0sIGRvY3VtZW50LmJvZHkuY2xhc3NMaXN0LnRvZ2dsZShgaGlkZS0ke3BhcmFtc1swXX1gKSk7DQoJCQkJCWJyZWFrOw0KCQkJCWNhc2UgJ3Zpc2liaWxpdHknOg0KCQkJCQlpZihwYXJhbXNbMV0pIHsNCgkJCQkJCWRvY3VtZW50LmJvZHkuY2xhc3NMaXN0LmFkZChgaGlkZS0ke3BhcmFtc1swXX1gKTsNCgkJCQkJfQ0KCQkJCQllbHNlIHsNCgkJCQkJCWRvY3VtZW50LmJvZHkuY2xhc3NMaXN0LnJlbW92ZShgaGlkZS0ke3BhcmFtc1swXX1gKTsNCgkJCQkJfQ0KCQkJCQlicmVhazsNCgkJCQljYXNlICdtYXJnaW4nOg0KCQkJCQljb250ZW50LnN0eWxlLm1hcmdpbiA9IHBhcmFtc1swXTsNCgkJCQkJYnJlYWs7DQoJCQkJY2FzZSAncGFkZGluZyc6DQoJCQkJCWNvbnRlbnQuc3R5bGUucGFkZGluZyA9IHBhcmFtc1swXTsNCgkJCQkJYnJlYWs7DQoJCQkJY2FzZSAndHJhbnNsYXRpb24nOg0KCQkJCQljb25zdCBzaG93VHJhbnNsYXRpb24gPSBwYXJhbXNbMF07DQoNCgkJCQkJaWYoc2hvd1RyYW5zbGF0aW9uICE9PSAndHJ1ZScpIHsNCgkJCQkJCWRvY3VtZW50LmJvZHkuY2xhc3NMaXN0LmFkZCgnaGlkZVRyYW5zbGF0aW9uJyk7DQoNCgkJCQkJCWlmKHNob3dUcmFuc2xhdGlvbiAhPT0gJ2ZhbHNlJykgew0KCQkJCQkJCWNvbnN0IHN0eWxlID0gZG9jdW1lbnQuY3JlYXRlRWxlbWVudCgnc3R5bGUnKTsNCgkJCQkJCQlkb2N1bWVudC5oZWFkLmFwcGVuZChzdHlsZSk7DQoNCgkJCQkJCQljb25zdCB2aXNpYmxlTGFuZ3VhZ2VzID0gc2hvd1RyYW5zbGF0aW9uLnNwbGl0KCcsJyk7DQoJCQkJCQkJdmlzaWJsZUxhbmd1YWdlcy5mb3JFYWNoKGxhbmd1YWdlID0+IHsNCgkJCQkJCQkJc3R5bGUuc2hlZXQuaW5zZXJ0UnVsZSgNCgkJCQkJCQkJCWBib2R5LmhpZGVUcmFuc2xhdGlvbiBwLnRyYW5zbGF0aW9uLmxhbmd1YWdlXyR7bGFuZ3VhZ2V9IHtkaXNwbGF5OiBibG9ja31gLA0KCQkJCQkJCQkJc3R5bGUuc2hlZXQuY3NzUnVsZXMubGVuZ3RoDQoJCQkJCQkJCSk7DQoJCQkJCQkJfSk7DQoJCQkJCQl9DQoJCQkJCX0NCgkJCQkJYnJlYWs7DQoJCQkJY2FzZSAnY2xvc2luZyc6DQoJCQkJCWxldCBjb3VudGVyID0gNDA7DQoJCQkJCWNvbnN0IHBhcmVudExvYWRlZCA9IHBhcmFtc1swXTsNCgkJCQkJY29uc3Qgam9iID0gc2V0SW50ZXJ2YWwoXyA9PiB7DQoJCQkJCQl0cnkgew0KCQkJCQkJCWNvbnN0IGxvYWRlZCA9IHNlbGYub3BlbmVyLmRvY3VtZW50LmJvZHkuZ2V0QXR0cmlidXRlKCdkYXRhLWxvYWRlZCcpOw0KDQoJCQkJCQkJaWYocGFyZW50TG9hZGVkICE9PSBsb2FkZWQpIHsNCgkJCQkJCQkJd2luZG93LmNsb3NlKCk7DQoJCQkJCQkJfQ0KDQoJCQkJCQkJaWYoY291bnRlci0tIDwgMCkgew0KCQkJCQkJCQljbGVhckludGVydmFsKGpvYik7DQoJCQkJCQkJfQ0KCQkJCQkJfSBjYXRjaChlKSB7DQoJCQkJCQkJd2luZG93LmNsb3NlKCk7DQoJCQkJCQl9DQoJCQkJCX0sIDUwMCk7DQoJCQkJCWJyZWFrOw0KCQkJCWRlZmF1bHQ6DQoJCQkJCWNvbnNvbGUubG9nKHR5cGUsIC4uLiBwYXJhbXMpOw0KCQkJfQ0KCQl9DQoNCgkJd2luZG93Lm9uZXJyb3IgPSBmdW5jdGlvbihtZXNzYWdlLCBzb3VyY2UsIGxpbmVubywgY29sbm8pIHsNCgkJCUFKQVgucG9zdCgncmVzdC9Mb2cnLCB7DQoJCQkJbWVzc2FnZTogYCR7c291cmNlfVske2xpbmVub306JHtjb2xub31dIC0gJHttZXNzYWdlfWANCgkJCX0pLmNhdGNoKGUgPT4gY29uc29sZS5lcnJvcihlKSk7DQoJCX0NCgk8L3NjcmlwdD4NCjwvYm9keT4NCjwvaHRtbD4='));
+				this.popup.document.write(atob('PCFET0NUWVBFIGh0bWw+DQo8aHRtbCBsYW5nPSJlbiI+DQo8aGVhZD4NCgk8bWV0YSBjaGFyc2V0PSJVVEYtOCI+DQoJPHRpdGxlPlByZXNlbnRlcjwvdGl0bGU+DQoNCgk8bGluayByZWw9InN0eWxlc2hlZXQiIGhyZWY9ImNzcy9zdHlsZS5jc3MiIG1lZGlhPSJhbGwiPg0KCTxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0iY3NzL2JhY2tncm91bmQuY3NzIiBtZWRpYT0iYWxsIj4NCgk8c3R5bGU+DQoJCWJvZHk6ZnVsbHNjcmVlbi5oaWRlLW1vdXNlIHsNCgkJCWN1cnNvcjogbm9uZTsNCgkJfQ0KDQoJCWJvZHkuaGlkZS1iYWNrZ3JvdW5kICNiYWNrZ3JvdW5kIHsNCgkJCW9wYWNpdHk6IDA7DQoJCX0NCg0KCQlib2R5LmhpZGUtcHJldmlldyAjY29udGVudCBwLnByZXZpZXcgew0KCQkJZGlzcGxheTogbm9uZTsNCgkJfQ0KDQoJCSNjb250ZW50IGJ1dHRvbiB7DQoJCQltYXJnaW4tdG9wOiAzMHZoOw0KCQkJcGFkZGluZzogMTBweCAxNXB4Ow0KCQkJZm9udC1zaXplOiA0dnc7DQoJCQlib3JkZXItcmFkaXVzOiAxNXB4Ow0KCQkJY29sb3I6IHZhcigtLWJyaWdodCk7DQoJCQliYWNrZ3JvdW5kOiB2YXIoLS1wcmltYXJ5KTsNCgkJCXZlcnRpY2FsLWFsaWduOiBtaWRkbGU7DQoJCQljdXJzb3I6IHBvaW50ZXI7DQoJCX0NCg0KCQkjY29udGVudCBidXR0b246aG92ZXIgew0KCQkJYmFja2dyb3VuZDogdmFyKC0taGlnaGxpZ2h0KTsNCgkJfQ0KCTwvc3R5bGU+DQo8L2hlYWQ+DQo8Ym9keT4NCgk8ZGl2IGlkPSJiYWNrZ3JvdW5kIj48L2Rpdj4NCgk8ZGl2IGlkPSJjb250ZW50Ij4NCgkJPGJ1dHRvbiB0eXBlPSJidXR0b24iPkFjdGl2YXRlIEZ1bGxzY3JlZW48L2J1dHRvbj4NCgk8L2Rpdj4NCg0KCTxzY3JpcHQ+DQoJCWNvbnN0IGNvbnRlbnQgPSBkb2N1bWVudC5xdWVyeVNlbGVjdG9yKCcjY29udGVudCcpOw0KCQljb25zdCBidXR0b24gPSBjb250ZW50LnF1ZXJ5U2VsZWN0b3IoJ2J1dHRvbicpOw0KCQlidXR0b24ub25jbGljayA9IF8gPT4gew0KCQkJZG9jdW1lbnQuYm9keS5yZXF1ZXN0RnVsbHNjcmVlbigpOw0KCQkJYnV0dG9uLnBhcmVudEVsZW1lbnQucmVtb3ZlQ2hpbGQoYnV0dG9uKTsNCgkJfTsNCg0KCQljb25zdCByZXF1ZXN0RnVsbHNjcmVlbiA9ICgpID0+IHsNCgkJCWRvY3VtZW50LmJvZHkucmVxdWVzdEZ1bGxzY3JlZW4oKTsNCgkJCWlmKGJ1dHRvbi5wYXJlbnRFbGVtZW50KSB7DQoJCQkJYnV0dG9uLnBhcmVudEVsZW1lbnQucmVtb3ZlQ2hpbGQoYnV0dG9uKTsNCgkJCX0NCgkJfTsNCg0KCQlkb2N1bWVudC5vbmtleWRvd24gPSAoZSkgPT4gew0KCQkJc3dpdGNoKGUuY29kZSkgew0KCQkJCWNhc2UgJ0tleUYnOg0KCQkJCQlpZighd2luZG93LmZ1bGxTY3JlZW4pIHsNCgkJCQkJCXJlcXVlc3RGdWxsc2NyZWVuKCk7DQoJCQkJCX0NCgkJCQkJYnJlYWs7DQoJCQl9DQoJCX07DQoNCgkJZG9jdW1lbnQuYm9keS5vbmRibGNsaWNrID0gXyA9PiB7DQoJCQlpZih3aW5kb3cuZnVsbFNjcmVlbikgew0KCQkJCWRvY3VtZW50LmV4aXRGdWxsc2NyZWVuKCk7DQoJCQl9DQoJCQllbHNlIHsNCgkJCQlyZXF1ZXN0RnVsbHNjcmVlbigpOw0KCQkJfQ0KCQl9Ow0KDQoJCWRvY3VtZW50LmJvZHkub25jb250ZXh0bWVudSA9IGUgPT4gew0KCQkJaWYod2luZG93LmZ1bGxTY3JlZW4gJiYgZG9jdW1lbnQuYm9keS5jbGFzc0xpc3QuY29udGFpbnMoJ2hpZGUtbW91c2UnKSkgew0KCQkJCWUucHJldmVudERlZmF1bHQoKTsNCgkJCQllLnN0b3BQcm9wYWdhdGlvbigpOw0KCQkJfQ0KCQl9DQoNCgkJbGV0IHJlc2l6ZUhhbmRsZXJUaW1lb3V0ID0gZmFsc2U7DQoJCXdpbmRvdy5yZXNpemVIYW5kbGVyID0gbnVsbDsNCgkJZG9jdW1lbnQuYm9keS5vbnJlc2l6ZSA9IF8gPT4gew0KCQkJaWYod2luZG93LnJlc2l6ZUhhbmRsZXIpIHsNCgkJCQlpZihyZXNpemVIYW5kbGVyVGltZW91dCAhPT0gZmFsc2UpIHsNCgkJCQkJY2xlYXJUaW1lb3V0KHJlc2l6ZUhhbmRsZXJUaW1lb3V0KTsNCgkJCQl9DQoNCgkJCQlyZXNpemVIYW5kbGVyVGltZW91dCA9IHNldFRpbWVvdXQoXyA9PiB7DQoJCQkJCXdpbmRvdy5yZXNpemVIYW5kbGVyKHsNCgkJCQkJCXBvcHVwVG9wOiB3aW5kb3cuc2NyZWVuWSwNCgkJCQkJCXBvcHVwTGVmdDogd2luZG93LnNjcmVlblgsDQoJCQkJCQlwb3B1cFdpZHRoOiB3aW5kb3cuaW5uZXJXaWR0aCwNCgkJCQkJCXBvcHVwSGVpZ2h0OiB3aW5kb3cuaW5uZXJIZWlnaHQNCgkJCQkJfSk7DQoNCgkJCQkJcmVzaXplSGFuZGxlclRpbWVvdXQgPSBmYWxzZTsNCgkJCQl9LCA5MDApOw0KCQkJfQ0KCQl9DQoNCgkJbGV0IGN1cnJlbnRBY3RpdmUgPSBudWxsOw0KCQl3aW5kb3cuaGFuZGxlciA9ICh0eXBlLCBjYWxsYmFjaywgLi4uIHBhcmFtcykgPT4gew0KCQkJc3dpdGNoKHR5cGUpIHsNCgkJCQljYXNlICdhY3RpdmUnOg0KCQkJCQlpZihjdXJyZW50QWN0aXZlICE9PSBwYXJhbXNbMF0pIHsNCgkJCQkJCWN1cnJlbnRBY3RpdmUgPSBwYXJhbXNbMF07DQoJCQkJCQljb25zdCBwcmV2aWV3ID0gcGFyYW1zWzFdOw0KDQoJCQkJCQl3aGlsZShjb250ZW50LmZpcnN0RWxlbWVudENoaWxkKSB7DQoJCQkJCQkJY29udGVudC5yZW1vdmVDaGlsZChjb250ZW50LmZpcnN0RWxlbWVudENoaWxkKTsNCgkJCQkJCX0NCg0KCQkJCQkJY29udGVudC5zdHlsZS5vcGFjaXR5ID0gY3VycmVudEFjdGl2ZS5jbGFzc0xpc3QuY29udGFpbnMoJ2NvcHlyaWdodCcpID8gJzAnIDogJyc7DQoJCQkJCQljb250ZW50LmNsYXNzTmFtZSA9IGN1cnJlbnRBY3RpdmUuY2xhc3NOYW1lOw0KDQoJCQkJCQlBcnJheS5mcm9tKGN1cnJlbnRBY3RpdmUuZ2V0RWxlbWVudHNCeVRhZ05hbWUoJ3AnKSkuZm9yRWFjaChjaGlsZCA9PiB7DQoJCQkJCQkJY29udGVudC5hcHBlbmQoY2hpbGQuY2xvbmVOb2RlKHRydWUpKTsNCgkJCQkJCX0pOw0KDQoJCQkJCQlpZihwcmV2aWV3KSB7DQoJCQkJCQkJcHJldmlldy5mb3JFYWNoKGxpbmUgPT4gew0KCQkJCQkJCQlsaW5lLmNsYXNzTGlzdC5hZGQoJ3ByZXZpZXcnKTsNCgkJCQkJCQkJY29udGVudC5hcHBlbmQobGluZSk7DQoJCQkJCQkJfSk7DQoJCQkJCQl9DQoNCgkJCQkJCWNvbnN0IGlzQmxhY2sgPSBjb250ZW50LmNsYXNzTGlzdC5jb250YWlucygnaGlkZS10ZXh0Jyk7DQoJCQkJCQlpZihpc0JsYWNrKSB7DQoJCQkJCQkJY29udGVudC5jbGFzc0xpc3QuYWRkKCdoaWRlLXRleHQnKTsNCgkJCQkJCX0NCgkJCQkJfQ0KCQkJCQlicmVhazsNCgkJCQljYXNlICdzb25nJzoNCgkJCQkJZG9jdW1lbnQuYm9keS5pZCA9IGBzb25nXyR7cGFyYW1zWzBdfWA7DQoJCQkJCWJyZWFrOw0KCQkJCWNhc2UgJ3RvZ2dsZVZpc2liaWxpdHknOg0KCQkJCQljYWxsYmFjayhwYXJhbXNbMF0sIGRvY3VtZW50LmJvZHkuY2xhc3NMaXN0LnRvZ2dsZShgaGlkZS0ke3BhcmFtc1swXX1gKSk7DQoJCQkJCWJyZWFrOw0KCQkJCWNhc2UgJ3Zpc2liaWxpdHknOg0KCQkJCQlpZihwYXJhbXNbMV0pIHsNCgkJCQkJCWRvY3VtZW50LmJvZHkuY2xhc3NMaXN0LmFkZChgaGlkZS0ke3BhcmFtc1swXX1gKTsNCgkJCQkJfQ0KCQkJCQllbHNlIHsNCgkJCQkJCWRvY3VtZW50LmJvZHkuY2xhc3NMaXN0LnJlbW92ZShgaGlkZS0ke3BhcmFtc1swXX1gKTsNCgkJCQkJfQ0KCQkJCQlicmVhazsNCgkJCQljYXNlICdtYXJnaW4nOg0KCQkJCQljb250ZW50LnN0eWxlLm1hcmdpbiA9IHBhcmFtc1swXTsNCgkJCQkJYnJlYWs7DQoJCQkJY2FzZSAncGFkZGluZyc6DQoJCQkJCWNvbnRlbnQuc3R5bGUucGFkZGluZyA9IHBhcmFtc1swXTsNCgkJCQkJYnJlYWs7DQoJCQkJY2FzZSAndHJhbnNsYXRpb25zJzoNCgkJCQkJY29uc3QgdHJhbnNsYXRpb25zID0gcGFyYW1zWzBdOw0KDQoJCQkJCWlmKHRyYW5zbGF0aW9ucyAhPT0gJ25vbmUnKSB7DQoJCQkJCQljb25zdCBzdHlsZSA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoJ3N0eWxlJyk7DQoJCQkJCQlkb2N1bWVudC5oZWFkLmFwcGVuZChzdHlsZSk7DQoNCgkJCQkJCXRyYW5zbGF0aW9ucy5zcGxpdCgnLCcpLmZvckVhY2gobGFuZ3VhZ2UgPT4gew0KCQkJCQkJCXN0eWxlLnNoZWV0Lmluc2VydFJ1bGUoDQoJCQkJCQkJCWBwLnRyYW5zbGF0aW9uLmxhbmd1YWdlLmxhbmd1YWdlXyR7bGFuZ3VhZ2V9IHtkaXNwbGF5OiBibG9ja31gLA0KCQkJCQkJCQlzdHlsZS5zaGVldC5jc3NSdWxlcy5sZW5ndGgNCgkJCQkJCQkpOw0KCQkJCQkJfSk7DQoJCQkJCX0NCgkJCQkJYnJlYWs7DQoJCQkJY2FzZSAnY2xvc2luZyc6DQoJCQkJCWxldCBjb3VudGVyID0gNDA7DQoJCQkJCWNvbnN0IHBhcmVudExvYWRlZCA9IHBhcmFtc1swXTsNCgkJCQkJY29uc3Qgam9iID0gc2V0SW50ZXJ2YWwoXyA9PiB7DQoJCQkJCQl0cnkgew0KCQkJCQkJCWNvbnN0IGxvYWRlZCA9IHNlbGYub3BlbmVyLmRvY3VtZW50LmJvZHkuZ2V0QXR0cmlidXRlKCdkYXRhLWxvYWRlZCcpOw0KDQoJCQkJCQkJaWYocGFyZW50TG9hZGVkICE9PSBsb2FkZWQpIHsNCgkJCQkJCQkJd2luZG93LmNsb3NlKCk7DQoJCQkJCQkJfQ0KDQoJCQkJCQkJaWYoY291bnRlci0tIDwgMCkgew0KCQkJCQkJCQljbGVhckludGVydmFsKGpvYik7DQoJCQkJCQkJfQ0KCQkJCQkJfSBjYXRjaChlKSB7DQoJCQkJCQkJd2luZG93LmNsb3NlKCk7DQoJCQkJCQl9DQoJCQkJCX0sIDUwMCk7DQoJCQkJCWJyZWFrOw0KCQkJCWRlZmF1bHQ6DQoJCQkJCWNvbnNvbGUubG9nKHR5cGUsIC4uLiBwYXJhbXMpOw0KCQkJfQ0KCQl9DQoNCgkJd2luZG93Lm9uZXJyb3IgPSBmdW5jdGlvbihtZXNzYWdlLCBzb3VyY2UsIGxpbmVubywgY29sbm8pIHsNCgkJCUFKQVgucG9zdCgncmVzdC9Mb2cnLCB7DQoJCQkJbWVzc2FnZTogYCR7c291cmNlfVske2xpbmVub306JHtjb2xub31dIC0gJHttZXNzYWdlfWANCgkJCX0pLmNhdGNoKGUgPT4gY29uc29sZS5lcnJvcihlKSk7DQoJCX0NCgk8L3NjcmlwdD4NCjwvYm9keT4NCjwvaHRtbD4='));
 				this.popup.document.close();
 
 				this.popup.onload = _ => {
@@ -581,7 +664,7 @@ class GUI extends Loadable {
 		this.subscribers = [];
 
 		rootElement.on('contextmenu', e => {
-			if(Config.get('hideMouse', true)) {
+			if(Config.get('HIDE_MOUSE')) {
 				e.preventDefault();
 			}
 		});
@@ -605,9 +688,9 @@ class GUI extends Loadable {
 		this.expand = new element('div').id('expand').parent(document.body);
 
 		new element('li').class('sidebar').parent(this.elementNav).on('click', _ => {
-			let shrunk = !Config.get('shrinkSidebar', false);
+			let shrunk = !Config.get('SHRINK_SIDEBAR');
 
-			Config.set('shrinkSidebar', shrunk);
+			Config.set('SHRINK_SIDEBAR', shrunk);
 
 			if(shrunk) {
 				document.body.classList.add('shrunk');
@@ -622,7 +705,7 @@ class GUI extends Loadable {
 			}
 		}).tooltip('Toggle search');
 		new element('li').class('add').parent(this.elementNav).on('click', _ => {
-			let name = Config.get('defaultVerseName', 'Vers 1');
+			let name = Config.get('DEFAULT_VERSE_NAME');
 			let blocks = {};
 			blocks[name] = '';
 
@@ -643,7 +726,7 @@ class GUI extends Loadable {
 
 			let newShow = new element('button').class('upload').text('New show').on('click', _ => {
 				let d = new Date();
-				let format = Config.get('showSaveFormat', 'Show {dd}.{MM}.{yyyy}');
+				let format = Config.get('SHOW_SAVE_FORMAT');
 
 				const z = n => {
 					return (n < 10) ? `0${n}` : `${n}`;
@@ -676,7 +759,7 @@ class GUI extends Loadable {
 				let offset = 0;
 
 				const loadMore = new element('li').text('Show more').on('click', _ => {
-					AJAX.get(`rest/Shows/${Config.get('showLimit', 10)}/${++offset}`).then(createShows).catch(e => {
+					AJAX.get(`rest/Shows/${Config.get('SHOW_LIMIT')}/${++offset}`).then(createShows).catch(e => {
 						Notification.error(e);
 						offset--;
 					});
@@ -692,7 +775,7 @@ class GUI extends Loadable {
 						});
 
 						new element('button').type('button').class('upload').tooltip('upload current songs to server').parent(li).on('click', _ => {
-							if(!Config.get('confirmShowOverwrite', true) || confirm('Overwrite show?')) {
+							if(!Config.get('CONFIRM_SHOW_OVERWRITE') || confirm('Overwrite show?')) {
 								this.notifySubscriber('uploadShow', show);
 								loadShows();
 							}
@@ -712,7 +795,7 @@ class GUI extends Loadable {
 						}
 
 						new element('button').type('button').text('×').tooltip('delete').parent(li).on('click', _ => {
-							if(!Config.get('confirmShowDeletion', true) || confirm('Delete show?')) {
+							if(!Config.get('CONFIRM_SHOW_DELETION') || confirm('Delete show?')) {
 								this.notifySubscriber('deleteShow', show);
 								li.remove();
 							}
@@ -724,7 +807,7 @@ class GUI extends Loadable {
 					}
 				};
 
-				AJAX.get(`rest/Shows/${Config.get('showLimit', 10)}`).then(({limit, shows}) => {
+				AJAX.get(`rest/Shows/${Config.get('SHOW_LIMIT')}`).then(({limit, shows}) => {
 					wrapper.clear();
 					createShows(({limit, shows}));
 				}).catch(e => {
@@ -743,12 +826,12 @@ class GUI extends Loadable {
 
 		const getPreviewLines = block => {
 			const preview = [];
-			if(Config.get('showNextLinePreview', 'true') && block.nextElementSibling && !block.nextElementSibling.classList.contains('copyright')) {
+			if(Config.get('SHOW_NEXT_LINE_PREVIEW') && block.nextElementSibling && !block.nextElementSibling.classList.contains('copyright')) {
 				let line = block.nextElementSibling.querySelector('p');
 				if(line) {
 					preview.push(line.cloneNode(true));
 
-					if(Config.get('showNextLinePreviewTranslation', 'true')) {
+					if(Config.get('SHOW_NEXT_LINE_PREVIEW_TRANSLATION')) {
 						while(line.nextElementSibling && line.nextElementSibling.classList.contains('translation')) {
 							line = line.nextElementSibling;
 							preview.push(line.cloneNode(true));
@@ -774,13 +857,13 @@ class GUI extends Loadable {
 		}).tooltip('Block screen popup');
 
 		PopUp.onLoad(send => {
-			PopUp.send('margin', Config.get('popupMargin', '1vw 0 .5vw'));
-			PopUp.send('padding', Config.get('popupPadding', '20px 0'));
+			PopUp.send('margin', Config.get('POPUP_MARGIN'));
+			PopUp.send('padding', Config.get('POPUP_PADDING'));
 
-			PopUp.send('visibility', 'mouse', Config.get('hideMouse', true));
+			PopUp.send('visibility', 'mouse', Config.get('HIDE_MOUSE'));
 			PopUp.send('visibility', 'text', this.elementPreview.classList.contains('hide-text'));
 
-			PopUp.send('translation', Config.get('showTranslation', 'true'));
+			PopUp.send('translations', Config.get('SHOWN_TRANSLATIONS'));
 
 			const song = this.elementPreview.getAttribute('song');
 			if(song) {
@@ -856,7 +939,7 @@ class GUI extends Loadable {
 			}
 		};
 		new element('button').type('button').class('all').parent(search).on('click', _ => {
-			AJAX.get(`rest/SongsAll/${Config.get('songOverviewOrder', 'lexicographic|numeric')}`).then(songs => {
+			AJAX.get(`rest/SongsAll/${Config.get('SONG_OVERVIEW_ORDER')}`).then(songs => {
 				let wrapper = new element('ul').class('songs');
 
 				songs.forEach(song => {
@@ -868,7 +951,7 @@ class GUI extends Loadable {
 						}).catch(e => Notification.error(e));
 					});
 
-					if(Config.get('showRemoveSongFromDatabase', false)) {
+					if(Config.get('SHOW_REMOVE_SONG_FROM_DATABASE')) {
 						new element('button').class('close').parent(li).on('click', _ => {
 							if(confirm(`Do you really want to remove the song "${song.title}" from the database?`)) {
 								AJAX.delete('rest/Song', {songNumber: song.songNumber}).then(e => {
@@ -917,18 +1000,18 @@ class GUI extends Loadable {
 					this.lines.home();
 					break;
 				case 'ArrowUp':
-					if(Config.get('useArrowsForMovingBetweenLines', true)) {
+					if(Config.get('USE_ARROWS_FOR_MOVING_BETWEEN_LINES')) {
 						this.lines.prev();
 					}
 					break;
 				case 'ArrowDown':
-					if(Config.get('useArrowsForMovingBetweenLines', true)) {
+					if(Config.get('USE_ARROWS_FOR_MOVING_BETWEEN_LINES')) {
 						this.lines.next();
 					}
 					break;
 				case 'ArrowLeft':
 				case 'ArrowRight':
-					if(!Config.get('useArrowsForMovingBetweenBlocks', true)) {
+					if(!Config.get('USE_ARROWS_FOR_MOVING_BETWEEN_BLOCKS')) {
 						return;
 					}
 
@@ -940,7 +1023,7 @@ class GUI extends Loadable {
 							const p = element.querySelector('p');
 
 							if(p) {
-								this.lines.to(p, !Config.get('headlineSmoothScrollBehaviour', false));
+								this.lines.to(p, !Config.get('HEADLINE_SMOOTH_SCROLL_BEHAVIOUR'));
 							}
 						}
 					}
@@ -975,15 +1058,15 @@ class GUI extends Loadable {
 		};
 
 		this.addOnLoadListener(_ => {
-			if(Config.get('shrinkSidebar', false)) {
+			if(Config.get('SHRINK_SIDEBAR')) {
 				document.body.classList.add('shrunk');
 			}
 
-			if(Config.get('showHideMouse', false)) {
+			if(Config.get('SHOW_HIDE_MOUSE')) {
 				new element('li').class('mouse').before(this.config).on('click', _ => {
 					const hideMouse = document.body.classList.toggle('hide-mouse');
 
-					Config.set('hideMouse', hideMouse);
+					Config.set('HIDE_MOUSE', hideMouse);
 					PopUp.send('visibility', 'mouse', hideMouse);
 				}).tooltip('Hide Mouse');
 			}
@@ -993,7 +1076,7 @@ class GUI extends Loadable {
 				window.resizeTo(screen.availWidth, screen.availHeight);
 			});
 			const checkMaximized = _ => {
-				if(!Config.get('showPreview', false) || screen.availWidth - window.innerWidth === 0) {
+				if(!Config.get('SHOW_PREVIEW') || screen.availWidth - window.innerWidth === 0) {
 					notMaximizedWarning.remove();
 				}
 				else {
@@ -1006,7 +1089,7 @@ class GUI extends Loadable {
 			checkMaximized();
 			document.body.onresize = checkMaximized;
 
-			rootElement.attribute('theme', Config.get('theme', 'default|calibration|boxed'));
+			rootElement.attribute('theme', Config.get('THEME'));
 		});
 
 		this.lines = new class {
@@ -1032,7 +1115,7 @@ class GUI extends Loadable {
 			add(control, preview) {
 				const lineId = this.lines.length;
 
-				control.on(Config.get('verseClickBehaviour', 'dblclick'), e => {
+				control.on(Config.get('VERSE_CLICK_BEHAVIOUR'), e => {
 					e.preventDefault();
 					e.stopPropagation();
 
@@ -1231,7 +1314,7 @@ class GUI extends Loadable {
 
 		let span = new element('span')
 			.text(song.title)
-			.on(Config.get('songClickBehaviour', 'dblclick'), e => {
+			.on(Config.get('SONG_CLICK_BEHAVIOUR'), e => {
 				e.stopPropagation();
 				e.preventDefault();
 
@@ -1248,7 +1331,7 @@ class GUI extends Loadable {
 			.on('touchend', e => {
 				e.preventDefault();
 
-				if(Date.now() - window.touchStartTimer > parseInt(Config.get('TouchDuration', 300))) {
+				if(Date.now() - window.touchStartTimer > parseInt(Config.get('TOUCH_DURATION'))) {
 					this.editSong(song, li);
 				}
 				else {
@@ -1262,7 +1345,7 @@ class GUI extends Loadable {
 				e.preventDefault();
 				e.stopPropagation();
 
-				if(Config.get('confirmSongDelete', true) && !confirm('Do you really want to remove the song?')) {
+				if(Config.get('CONFIRM_SONG_DELETE') && !confirm('Do you really want to remove the song?')) {
 					return;
 				}
 
@@ -1299,7 +1382,7 @@ class GUI extends Loadable {
 				new element('p')
 					.parent(block)
 					.html(text)
-					.class('translation', `language_${language}`)
+					.class('translation', 'language', `language_${language}`)
 					.attribute('language', language);
 			});
 		}
@@ -1320,7 +1403,7 @@ class GUI extends Loadable {
 
 		this.switchActive(this.elementSongs, li);
 
-		if(Config.get('resetBlackOnSongSwitch', false)) {
+		if(Config.get('RESET_BLACK_ON_SONG_SWITCH')) {
 			this.elementPreview.classList.remove('hide-text');
 		}
 
@@ -1343,7 +1426,7 @@ class GUI extends Loadable {
 
 				let header = new element('h1').text(order).parent(block).listener('click', _ => {
 					if(header.nextElementSibling) {
-						this.lines.to(header.nextElementSibling, !Config.get('headlineSmoothScrollBehaviour', false));
+						this.lines.to(header.nextElementSibling, !Config.get('HEADLINE_SMOOTH_SCROLL_BEHAVIOUR'));
 					}
 				});
 				block.data('nav', header);
@@ -1387,10 +1470,10 @@ class GUI extends Loadable {
 		let header = new element('h1').html('©<em>Copyright</em>').parent(block);
 		this.addLine(block, song.info.join('<br />')).class('copyright');
 
-		if(!Config.get('showPreview', false)) {
+		if(!Config.get('SHOW_PREVIEW')) {
 			header.listener('click', _ => {
 				if(header.nextElementSibling) {
-					this.lines.to(header.nextElementSibling, !Config.get('headlineSmoothScrollBehaviour', false));
+					this.lines.to(header.nextElementSibling, !Config.get('HEADLINE_SMOOTH_SCROLL_BEHAVIOUR'));
 				}
 			});
 		}
@@ -1474,7 +1557,7 @@ class GUI extends Loadable {
 		let ul = new element('ul').class('options').parent(wrapper);
 		options.parent(ul);
 		new element('button').type('button').class('add').parent(options).on('click', _ => {
-			let name = prompt('Name', Config.get('newVerseValue', 'Outro'));
+			let name = prompt('Name', Config.get('DEFAULT_NEW_VERSE_NAME'));
 
 			if(!name) {
 				return;
@@ -1600,7 +1683,7 @@ class GUI extends Loadable {
 			song.saveOrder(newOrder);
 
 			if(li) {
-				if(Config.get('reloadSongAfterEdit', false)) {
+				if(Config.get('RELOAD_SONG_AFTER_EDIT')) {
 					this.showSong(song, li);
 				}
 			}
@@ -1624,44 +1707,45 @@ class GUI extends Loadable {
 	showConfig() {
 		let table = new element('table').class('config');
 
-		Config.forEach((v, k) => {
-			let tr = new element('tr').parent(table).on('contextmenu', _ => {
-				let td = tr.querySelector('td');
+		Config.forEach((v, k, _, d) => {
+			const description = new element('th').text(k);
+			const value = new element('td').attribute('key', k)
 
-				if(td) {
-					td.setAttribute('reset', td.getAttribute('reset') === 'true' ? 'false' : 'true');
-				}
-			});
-			new element('th').text(k).parent(tr);
-			new element('td').text(v).parent(tr)
-				.attribute('contenteditable', 'true')
-				.attribute('reset', 'false')
-				.attribute('type', typeof v)
-				.attribute('key', k)
-		});
+			if(Array.isArray(d)) {
+				const select = new element('select').parent(value);
 
-		Modal.show('Configuration', table).width('600px').resizable('290px').onApply(_ => {
-			Array.from(table.getElementsByTagName('td')).forEach(td => {
-				let key = td.getAttribute('key');
+				d.forEach(option => {
+					new element('option').text(option).value(option).selected(option === v).parent(select);
+				});
+			}
+			else {
+				value.attribute('contenteditable', 'true').text(v);
+			}
 
-				if(td.getAttribute('reset') === 'true') {
-					Config.set(key, undefined);
+			new element('tr').parent(table).on('contextmenu', _ => {
+				if(Array.isArray(d)) {
+					value.querySelector('option').selected = true;
 				}
 				else {
-					let value = td.textContent.trim();
-
-					switch(td.getAttribute('type')) {
-						case 'number':
-							// ToDo fix this, value will be a Number() and not expected in the config data
-							// value = Number.bind(null, value);
-							value = parseFloat(value);
-							break;
-						case 'boolean':
-							value = value === 'true';
-					}
-
-					Config.set(key, value);
+					value.text(d);
 				}
+			}).child(description, value);
+		});
+
+		Modal.show('Configuration', table).width('650px').resizable('360px').onApply(_ => {
+			Array.from(table.getElementsByTagName('td')).forEach(td => {
+				const key = td.getAttribute('key');
+				const select = td.querySelector('select');
+				let value;
+
+				if(select) {
+					value = select.value.trim();
+				}
+				else {
+					value = td.textContent.trim();
+				}
+
+				Config.set(key, value);
 			})
 		});
 	}
@@ -1684,7 +1768,7 @@ window.onerror = function(message, source, lineno, colno) {
 }
 
 window.onbeforeunload = e => {
-	if(Config.get('confirmPageLeave', true)) {
+	if(Config.get('CONFIRM_PAGE_LEAVE')) {
 		e.preventDefault();
 		e.returnValue = '';
 

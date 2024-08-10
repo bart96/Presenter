@@ -76,7 +76,7 @@ class Song {
 		}
 
 		if(this.authors !== SONG_UNKNOWN_AUTHOR) {
-			info.push(`${Config.get('authors', 'Autoren')}: ${this.authors}`);
+			info.push(`${Config.get('AUTHORS')}: ${this.authors}`);
 		}
 
 		if(this.copyright !== SONG_UNKNOWN_COPYRIGHT) {
@@ -303,7 +303,7 @@ class CCLISong extends Song {
 		let lines = super.info;
 
 		if(this.id > SONG_CUSTOM_NUMBER_LIMIT) {
-			lines.push(`${Config.get('CCLILicensenumber', 'CCLI-Lizenznummer')}: ${this.account}`);
+			lines.push(`${Config.get('CCLI_LICENSE_NUMBER')}: ${this.account}`);
 		}
 
 		return lines;
@@ -311,13 +311,18 @@ class CCLISong extends Song {
 
 	exists() {
 		return new Promise((resolve, reject) => {
-			AJAX.get(`rest/SongExists/${this.id}`).then(({exists, order}) => {
-				if(exists) {
-					this.order = order;
-				}
+			if(Account.isLoggedIn) {
+				AJAX.get(`rest/SongExists/${this.id}`).then(({exists, order}) => {
+					if(exists) {
+						this.order = order;
+					}
 
-				resolve({exists, song: this});
-			}).catch(reject);
+					resolve({exists, song: this});
+				}).catch(reject);
+			}
+			else {
+				resolve({exists: false, song: this});
+			}
 		});
 	}
 
@@ -333,7 +338,7 @@ class CCLISong extends Song {
 				else {
 					this.id = parseInt(songNumber);
 
-					if(Config.get('showSongUploadNotifications', true)) {
+					if(Config.get('SHOW_SONG_UPLOAD_NOTIFICATIONS')) {
 						Notification.success(`Song #${songNumber} "${title}" successfully uploaded`);
 					}
 
@@ -341,11 +346,16 @@ class CCLISong extends Song {
 				}
 			};
 
-			if(overwrite) {
-				AJAX.put('rest/Song', this).then(success).catch(reject);
+			if(Account.isLoggedIn) {
+				if(overwrite) {
+					AJAX.put('rest/Song', this).then(success).catch(reject);
+				}
+				else {
+					AJAX.post('rest/Song', this).then(success).catch(reject);
+				}
 			}
 			else {
-				AJAX.post('rest/Song', this).then(success).catch(reject);
+				resolve(this);
 			}
 		});
 	}
