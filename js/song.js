@@ -196,7 +196,6 @@ class CCLISong extends Song {
 		// format 2023-07
 		if(filename.endsWith('-lyrics.txt')) {
 			const blocks = content.trim().split('\n\n');
-			console.log(blocks);
 
 			song.title = blocks.shift().trim();
 

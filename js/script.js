@@ -458,7 +458,7 @@ const Config = new class extends Storable {
 		SHRINK_SIDEBAR: [false, true],
 		SONG_CLICK_BEHAVIOUR: ['dblclick', 'click'],
 		SONG_OVERVIEW_ORDER: ['lexicographic', 'numeric'],
-		THEME: ['boxed', 'default', 'calibration'],
+		THEME: ['boxed', 'list', 'calibration'],
 		TOUCH_DURATION: 300,
 		USE_ARROWS_FOR_MOVING_BETWEEN_BLOCKS: [true, false],
 		USE_ARROWS_FOR_MOVING_BETWEEN_LINES: [true, false],
@@ -543,8 +543,6 @@ const Config = new class extends Storable {
 
 		if(translations !== 'none') {
 			const style = new element('style').parent(document.head);
-
-			console.log(this.get, this.data, this.options, this.get('SHOWN_TRANSLATIONS'))
 
 			this.get('SHOWN_TRANSLATIONS').split(',').forEach(language => {
 				style.appendCSSRule(`p.translation.language.language_${language} {display: block}`);
