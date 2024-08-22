@@ -823,7 +823,8 @@ main #preview p.copyright small {
 	background: var(--dark-highlight);
 }
 
-.modal .song .info input {
+.modal .song .info input,
+.modal .song .info select {
 	display: none;
 	padding: 8px 10px;
 	flex-grow: 1;
@@ -831,7 +832,8 @@ main #preview p.copyright small {
 
 .modal .song .info.title input.title,
 .modal .song .info.authors input.authors,
-.modal .song .info.copyright input.copyright {
+.modal .song .info.copyright input.copyright,
+.modal .song .info.bg select.bg {
 	display: block;
 }
 

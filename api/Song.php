@@ -22,22 +22,26 @@
 			];
 
 			$stmt = self::prepare('
-				SELECT `title`, `initialOrder`, `order`, `authors`, `copyright`
+				SELECT `title`, `initialOrder`, `order`, `authors`, `copyright`, `background`, `css`
 				FROM `songs`
 				WHERE `songnumber` = ?
 				AND `account` = ?
 			');
 
 			$stmt->bind_param('ii', $songNumber, $account)->execute();
-			$stmt->bind_result($title, $initialOrder, $order, $authors, $copyright);
+			$stmt->bind_result($title, $initialOrder, $order, $authors, $copyright, $background, $css);
 
 			if($stmt->fetch()) {
-				$result['title'] = $title;
-				$result['initialOrder'] = explode(self::SEPARATOR_ORDER, $initialOrder);
-				$result['order'] = explode(self::SEPARATOR_ORDER, $order);
-				$result['blocks'] = [];
-				$result['authors'] = $authors;
-				$result['copyright'] = $copyright;
+				$result[] = [
+					'title' => $title,
+					'initialOrder' => explode(self::SEPARATOR_ORDER, $initialOrder),
+					'order' => explode(self::SEPARATOR_ORDER, $order),
+					'blocks' => [],
+					'authors' => $authors,
+					'copyright' => $copyright,
+					'background' => $background,
+					'css' => $css
+				];
 
 				$stmt->close();
 
@@ -82,7 +86,7 @@
 			$authors = $req->params->get('authors', self::UNKNOWN_AUTHOR);
 			$copyright = $req->params->get('copyright', self::UNKNOWN_COPYRIGHT);
 
-			if($songNumber === NULL || $songNumber < 0) {
+			if($songNumber <= 0) {
 				$songNumber = $this->generateSongNumber($account);
 			}
 

@@ -59,3 +59,7 @@ ALTER TABLE `songs`
 	ADD FULLTEXT KEY `title` (`title`);
 
 COMMIT;
+
+ALTER TABLE `songs` ADD `background` VARCHAR(300) NULL AFTER `order`, ADD `css` TEXT NULL AFTER `background`;
+
+COMMIT;

@@ -14,7 +14,9 @@ class Song {
 			songNumber: -Date.now(),
 			blocks: {},
 			initialOrder: [],
-			order: []
+			order: [],
+			background: '',
+			css: ''
 		}, obj);
 
 		this.changeListener = [];
@@ -26,6 +28,8 @@ class Song {
 		this.blocks = obj.blocks;
 		this.initialOrder = obj.initialOrder;
 		this.order = obj.order;
+		this.background = obj.background;
+		this.css = obj.css;
 	}
 
 	toJSON() {
@@ -107,21 +111,21 @@ class Song {
 	}
 
 	setTitle(title) {
-		let old = this.title;
+		const old = this.title;
 		this.title = title;
 
 		this.notify('songTitle', this, old);
 	}
 
 	setAuthors(authors) {
-		let old = this.authors;
+		const old = this.authors;
 		this.authors = authors;
 
 		this.notify('authors', this, old);
 	}
 
 	setCopyright(copyright) {
-		let old = this.copyright;
+		const old = this.copyright;
 		this.copyright = copyright;
 
 		this.notify('copyright', this, old);
@@ -172,7 +176,26 @@ class Song {
 	}
 
 	saveOrder(order) {
+		const old = this.order;
 		this.order = order;
+
+		this.notify('order', this, old);
+		return this;
+	}
+
+	setBackground(background) {
+		const old = this.background;
+		this.background = background;
+
+		this.notify('background', this, old);
+		return this;
+	}
+
+	setCss(css) {
+		const old = this.css;
+		this.css = css;
+
+		this.notify('css', this, old);
 		return this;
 	}
 

@@ -406,8 +406,9 @@ const Notification = new class extends Loadable {
 }
 
 /**
- * @typedef { 'AUTHORS' | 'CCLI_LICENSE_NUMBER' | 'CONFIRM_PAGE_LEAVE' | 'CONFIRM_SHOW_DELETION' |
- * 'CONFIRM_SHOW_OVERWRITE' | 'CONFIRM_SONG_DELETE' | 'DEFAULT_NEW_VERSE_NAME' | 'DEFAULT_VERSE_NAME' |
+ * @typedef { 'APP_DATA' | 'AUTHORS' | 'CCLI_LICENSE_NUMBER' | 'CONFIRM_PAGE_LEAVE' |
+ * 'CONFIRM_SHOW_DELETION' |  'CONFIRM_SHOW_OVERWRITE' | 'CONFIRM_SONG_DELETE' |
+ * 'DEFAULT_NEW_VERSE_NAME' | 'DEFAULT_VERSE_NAME' |
  * 'HEADLINE_SMOOTH_SCROLL_BEHAVIOUR' | 'HIDE_MOUSE' | 'NOTIFICATION_COUNT' |
  * 'NOTIFICATION_DISAPPEAR_TIME' | 'OVERRIDE_SONG_BY_IMPORT' | 'POPUP_HEIGHT' |
  * 'POPUP_LEFT' | 'POPUP_MARGIN' | 'POPUP_PADDING' | 'POPUP_TOP' | 'POPUP_WIDTH' |
@@ -425,6 +426,7 @@ const Config = new class extends Storable {
 	 * @type {Object.<ConfigKey, any>}
 	 */
 	options = {
+		APP_DATA: 'http://localhost:9000',
 		AUTHORS: 'Autoren',
 		CCLI_LICENSE_NUMBER: 'CCLI-Lizenznummer',
 		CONFIRM_PAGE_LEAVE: [true, false],
@@ -687,8 +689,6 @@ class GUI extends Loadable {
 
 		new element('li').class('sidebar').parent(this.elementNav).on('click', _ => {
 			let shrunk = !Config.get('SHRINK_SIDEBAR');
-
-			console.log(shrunk, Config.get('SHRINK_SIDEBAR'), Config.data);
 
 			Config.set('SHRINK_SIDEBAR', shrunk);
 
@@ -1507,6 +1507,7 @@ class GUI extends Loadable {
 		const title = new element('input');
 		const authors = new element('input');
 		const copyright = new element('input');
+		const background = new element('select');
 		const editBlock = new element('textarea');
 		const editOrder = new element('ul');
 		const options = new element('li');
@@ -1583,31 +1584,51 @@ class GUI extends Loadable {
 		new element('button').type('button').class('delete').parent(options).on('click', _ => {
 			wrapper.classList.toggle('remove');
 		});
+		new element('button').type('button').class('css').text('Style').parent(options).on('click', _ => {
+			// ToDo CSS
+		});
 
 		const info = new element('div').class('info', 'title').parent(wrapper);
+		const resetInfoClasses = () => {
+			info.classList.remove('title', 'authors', 'copyright', 'bg');
+		};
 
 		title.type('text').class('title').value(song.title).placeholder('Title').parent(info);
 		authors.type('text').class('authors').value(song.authors).placeholder('Authors').parent(info);
 		copyright.type('text').class('copyright').value(song.copyright).placeholder('Copyright').parent(info);
+		background.class('bg').clear().parent(info).child(
+			new element('option').value('').text('- NONE -')
+		).on('contextmenu', _ => {
+			window.open(`${Config.get('APP_DATA')}/${background.value()}`, '_blank');
+		});
+		AJAX.get(Config.get('APP_DATA')).then(r => {
+			r.forEach(file => {
+				new element('option').value(file).text(file).parent(background);
+			});
+		});
 
 		new element('button').type('text').class('title').text('Title').parent(info).on('click', _ => {
-			info.classList.remove('authors', 'copyright');
+			resetInfoClasses();
 			info.class('title');
 		});
 		new element('button').type('text').class('authors').text('Authors').parent(info).on('click', _ => {
-			info.classList.remove('title', 'copyright');
+			resetInfoClasses();
 			info.class('authors');
 		}).on('contextmenu', _ => {
 			authors.value(SONG_UNKNOWN_AUTHOR);
 		});
 		new element('button').type('text').class('copyright').text('©').parent(info).on('click', _ => {
-			info.classList.remove('title', 'authors');
+			resetInfoClasses();
 			info.class('copyright');
 		}).on('dblclick', _ => {
 			copyright.value(`© ${copyright.value()}`);
 		}).on('contextmenu', _ => {
 			copyright.value(SONG_UNKNOWN_COPYRIGHT);
 			copyright.focus();
+		});
+		new element('button').type('text').class('bg').text('Background').parent(info).on('click', _ => {
+			resetInfoClasses();
+			info.class('bg');
 		});
 
 		editBlock.parent(wrapper).on('blur', editBlockHandler);
